@@ -41,8 +41,11 @@ Live on the Windows PC, Millennium v3.6.3, 15 November 2026: in
 `utils.write_file`, `utils.read_file`, and `fs.rename(tmp, final)`, and the
 rename replaced an existing target. `utils.get_backend_path()` returns `""` for
 packed .star plugins, so nothing may depend on it (the tag store does not).
-Still unverified: Lua `io.open` there (the store reads and writes through it)
-and a profile path with non-ASCII characters.
+Lua `io.open` with `"wb"` and `"rb"` round-trips byte-exact there, and
+`os.getenv("APPDATA")` works. `os.rename(tmp, p)` fails with "File exists" when
+`p` exists (Windows C rename does not replace), while `fs.rename` does replace;
+the store swaps files only through `fs.rename` (`backend/tagstore/fsio.lua`).
+Still unverified: a profile path with non-ASCII characters.
 
 Earlier notes:
 
