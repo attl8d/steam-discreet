@@ -263,6 +263,7 @@ describe("updater", function()
             assert.is_nil(p.files[DIR .. "/staged.json"])
             assert.are.equal("0.2.0", u:status().last_applied.to)
             assert.is_nil(u:status().last_apply_error)
+            assert.are_not.equal("0.2.0", u:status().last_applied.from)
         end)
 
         it("leaves the update staged when the plugin was installed under another name", function()

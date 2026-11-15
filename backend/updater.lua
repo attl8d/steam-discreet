@@ -298,9 +298,13 @@ function Updater:apply_staged()
         local live_now = self.p.read_file(paths.live)
         if live_now and sha256.hex(live_now) == pending.sha256 then
             self:remove(paths.staged_meta)
+            -- This runs in the session after the swap, so the running version
+            -- is already the new one; the backup records what it replaced.
+            local previous = self:read_json(paths.previous_meta)
+            local from = pending.rollback and nil or (previous and previous.version)
             self:save_state({
                 last_apply_error = false,
-                last_applied = { from = self.current, to = pending.version, at = self.p.now(),
+                last_applied = { from = from or "unknown", to = pending.version, at = self.p.now(),
                     rollback = pending.rollback == true, recovered = true },
             })
             return { result = "already_applied", to = pending.version }
