@@ -22,7 +22,7 @@ function M.install_millennium_stubs()
 end
 
 function M.reset()
-    for _, name in ipairs({ "logger", "millennium", "main" }) do
+    for _, name in ipairs({ "logger", "millennium", "main", "hooks" }) do
         package.loaded[name] = nil
     end
 end

@@ -1,14 +1,25 @@
 -- Steam Discreet backend entry point.
--- Lifecycle only. Tag storage (M2), patch loading from hooks/ (M5) and the
--- updater (M6) are added by their own milestones; see docs/PLAN.md.
+-- Lifecycle and patch loading. Tag storage (M2) and the updater (M6) are added
+-- by their own milestones; see docs/PLAN.md.
 
 local logger     = require("logger")
 local millennium = require("millennium")
+local hooks      = require("hooks")
 
 local M = {}
 
+-- Read once, when Millennium loads this file. Problems in the data file never
+-- stop the plugin: the affected hooks are left out and Steam stays unpatched.
+local loaded_hooks = hooks.load()
+
 function M.on_load()
     logger:info("Steam Discreet loaded on Millennium " .. tostring(millennium.version()))
+    if loaded_hooks.error then
+        logger:error("Hooks disabled: " .. loaded_hooks.error)
+    end
+    for _, r in ipairs(loaded_hooks.rejected) do
+        logger:error("Hook '" .. r.id .. "' rejected: " .. r.reason)
+    end
     millennium.ready()
 end
 
@@ -21,8 +32,13 @@ function M.on_frontend_loaded()
     logger:info("Steam Discreet frontend loaded")
 end
 
+-- What the frontend self-check expects. Wired to the settings page later.
+function M.hook_manifest()
+    return hooks.manifest(loaded_hooks)
+end
+
 -- Static patch table, read once by Millennium at load. It cannot depend on
--- account or configuration. Empty until hook definitions exist (M1/M5).
-M.patches = {}
+-- account or configuration. Placeholder hooks are never included.
+M.patches = hooks.patches(loaded_hooks)
 
 return M

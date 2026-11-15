@@ -1,0 +1,12 @@
+[package]
+name = "patch-crosscheck"
+version = "0.0.0"
+edition = "2021"
+publish = false
+description = "Runs the hook fixtures through the Rust regex crate the way Millennium does, and compares with the bun harness."
+
+[dependencies]
+# Millennium v3.6.3 declares regex = "1" (src/instrumentation/loopback/Cargo.toml).
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

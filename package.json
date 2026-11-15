@@ -5,10 +5,11 @@
     "prepare": "starlight lsp",
     "typecheck": "tsc -p frontend && tsc -p webview && tsc -p tests",
     "lint": "eslint .",
-    "lint:lua": "luacheck backend tests/lua",
-    "test": "bun test tests/frontend",
+    "lint:lua": "luacheck backend tests/lua scripts",
+    "test": "bun test tests/frontend tests/hooks",
     "test:lua": "luajit \"$(command -v busted)\"",
-    "check": "bun run typecheck && bun run lint && bun run test && bun run lint:lua && bun run test:lua"
+    "check": "bun run typecheck && bun run lint && bun run test && bun run lint:lua && bun run test:lua",
+    "test:hooks:rust": "bun tests/hooks/crosscheck.ts tools/patch-crosscheck/target/cases.json && cargo run --locked -q --manifest-path tools/patch-crosscheck/Cargo.toml -- tools/patch-crosscheck/target/cases.json"
   },
   "devDependencies": {
     "@eslint/js": "9.39.1",
