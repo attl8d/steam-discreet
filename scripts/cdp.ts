@@ -1,4 +1,4 @@
-// CDP helper for inspecting the live Steam client (M1, repair loop).
+﻿// CDP helper for inspecting the live Steam client (M1, repair loop).
 //
 // Needs `<Steam>\.cef-enable-remote-debugging` and a Steam restart, which
 // exposes the Chrome DevTools Protocol on localhost:8080.
@@ -15,6 +15,8 @@
 // Never evaluate anything that writes to Steam collections, Hidden or Private
 // state. This script only reads unless the expression you pass writes.
 
+export {};
+
 const PORT = Number(process.env.CDP_PORT ?? 8080);
 
 interface Target {
@@ -26,8 +28,8 @@ interface Target {
 }
 
 async function listTargets(): Promise<Target[]> {
-	const res = await fetch(`http://127.0.0.1:${PORT}/json`);
-	if (!res.ok) throw new Error(`CDP /json returned ${res.status}`);
+	const res = await fetch(`http://127.0.0.1:${String(PORT)}/json`);
+	if (!res.ok) throw new Error(`CDP /json returned ${String(res.status)}`);
 	return (await res.json()) as Target[];
 }
 
@@ -60,8 +62,12 @@ class Session {
 	static open(url: string): Promise<Session> {
 		return new Promise((resolve, reject) => {
 			const ws = new WebSocket(url);
-			ws.onopen = () => resolve(new Session(ws));
-			ws.onerror = () => reject(new Error(`could not open ${url}`));
+			ws.onopen = () => {
+				resolve(new Session(ws));
+			};
+			ws.onerror = () => {
+				reject(new Error(`could not open ${url}`));
+			};
 		});
 	}
 
@@ -83,11 +89,11 @@ class Session {
 function parseArgs(argv: string[]) {
 	const opts = { target: 'SharedJSContext', context: 300, regex: false, max: 20 };
 	const rest: string[] = [];
-	for (let i = 0; i < argv.length; i++) {
-		const a = argv[i]!;
-		if (a === '--target') opts.target = argv[++i]!;
-		else if (a === '--context') opts.context = Number(argv[++i]);
-		else if (a === '--max') opts.max = Number(argv[++i]);
+	const args = [...argv];
+	for (let a = args.shift(); a !== undefined; a = args.shift()) {
+		if (a === '--target') opts.target = args.shift() ?? opts.target;
+		else if (a === '--context') opts.context = Number(args.shift());
+		else if (a === '--max') opts.max = Number(args.shift());
 		else if (a === '--regex') opts.regex = true;
 		else rest.push(a);
 	}
@@ -149,14 +155,14 @@ async function cmdFind(title: string, anchor: string, context: number, useRegex:
 				for (let i = src.indexOf(anchor); i !== -1; i = src.indexOf(anchor, i + 1)) positions.push(i);
 			}
 			if (positions.length === 0) continue;
-			console.log(`\n=== ${sc.url}  (${positions.length} match${positions.length === 1 ? '' : 'es'}, ${src.length} chars)`);
+			console.log(`\n=== ${sc.url}  (${String(positions.length)} match${positions.length === 1 ? '' : 'es'}, ${String(src.length)} chars)`);
 			for (const pos of positions.slice(0, max)) {
-				console.log(`--- @${pos}`);
+				console.log(`--- @${String(pos)}`);
 				console.log(src.slice(Math.max(0, pos - context), pos + context));
 			}
 			hits += positions.length;
 		}
-		console.log(`\n${hits} match(es) in ${scripts.length} scripts`);
+		console.log(`\n${String(hits)} match(es) in ${String(scripts.length)} scripts`);
 		await s.send('Debugger.disable');
 	} finally {
 		s.close();

@@ -1,9 +1,9 @@
-{
+﻿{
   "scripts": {
     "dev": "starlight watch",
     "build": "starlight pack",
     "prepare": "starlight lsp",
-    "typecheck": "tsc -p frontend && tsc -p webview && tsc -p tests",
+    "typecheck": "tsc -p frontend && tsc -p webview && tsc -p tests && tsc -p scripts",
     "lint": "eslint .",
     "lint:lua": "luacheck backend tests/lua",
     "test": "bun test tests/frontend",
