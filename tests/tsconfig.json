@@ -1,0 +1,8 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "..",
+    "types": ["bun"]
+  },
+  "include": ["frontend/**/*", "../frontend/**/*", "../.millennium/types/**/*.d.ts"]
+}

@@ -1,0 +1,7 @@
+node_modules/
+/.millennium/
+/.luarocks/
+/lua_modules/
+*.star
+.DS_Store
+.millennium/lsp/

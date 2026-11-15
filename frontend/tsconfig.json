@@ -1,0 +1,4 @@
+{
+  "extends": "../tsconfig.json",
+  "include": [".", "../.millennium/types/**/*.d.ts"]
+}

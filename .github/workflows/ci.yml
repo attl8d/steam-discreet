@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      # Runs `starlight lsp` via prepare, which generates the Millennium types.
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+      - run: bun run lint
+      - run: bun run test
+      - name: Package plugin
+        run: mkdir -p dist && ./node_modules/.bin/starlight pack -o dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: steam-discreet-star
+          path: dist/*.star
+          if-no-files-found: error
+
+  backend:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      # Millennium's backend runs on LuaJIT; busted runs the specs under it.
+      - name: Install LuaJIT, busted and luacheck
+        run: sudo apt-get update && sudo apt-get install -y luajit lua-busted lua-check
+      - run: luajit -v
+      - name: Lint Lua
+        run: luacheck backend tests/lua
+      - name: Test Lua
+        run: luajit "$(command -v busted)"

@@ -1,0 +1,38 @@
+[plugin]
+id = "steam-discreet"
+name = "Steam Discreet"
+version = "0.1.0"
+author = "attl8d"
+description = "Hides games you tag from ordinary Library browsing until one toggle reveals them."
+
+[assets]
+resources = ["resources/**/*"]
+
+[backend]
+entry = "backend/main.lua"
+sources = ["backend/**/*.lua"]
+
+[frontend]
+entry = "frontend/index.tsx"
+
+[webkit]
+entry = "webview/preload.ts"
+
+[compiler]
+# "auto" installs straight into the local Millennium plugins folder.
+# M1 sets an explicit development path here once the Windows setup is known.
+output_path = "auto"
+
+[dev]
+auto_restart = true
+reload_steamui_when = "both"
+
+[logger]
+padding = 0
+backend_prefix  = "BCK"
+frontend_prefix = "FRT"
+webview_prefix  = "WEB"
+
+[patches]
+# Surfaces url_seen / match / no_match / conflict events while hooks are developed.
+debug = true

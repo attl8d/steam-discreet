@@ -1,0 +1,10 @@
+return {
+    _all = {
+        lua = "luajit",
+        lpath = "backend/?.lua;backend/?/init.lua;tests/lua/?.lua",
+    },
+    default = {
+        ROOT = { "tests/lua" },
+        pattern = "_spec",
+    },
+}
