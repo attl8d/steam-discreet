@@ -16,13 +16,18 @@ function M.install_millennium_stubs()
     }
     function millennium.ready() millennium.ready_calls = millennium.ready_calls + 1; return true end
 
+    -- fs, utils and http are only called inside RPC functions, never at load,
+    -- so empty tables are enough for loading the backend.
     package.loaded["logger"] = logger
     package.loaded["millennium"] = millennium
+    package.loaded["fs"] = {}
+    package.loaded["utils"] = {}
+    package.loaded["http"] = {}
     return { logger = logger, millennium = millennium }
 end
 
 function M.reset()
-    for _, name in ipairs({ "logger", "millennium", "main" }) do
+    for _, name in ipairs({ "logger", "millennium", "fs", "utils", "http", "diagnostics", "main" }) do
         package.loaded[name] = nil
     end
 end
