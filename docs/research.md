@@ -125,6 +125,16 @@ Measured through the plugin's own Lua backend (`sd_diag_probe` in `backend/diagn
 
 APIs used: `utils.getenv("APPDATA")`, `fs.create_directories`, `utils.write_file`, `fs.rename(tmp, final)`, `utils.read_file`, `fs.remove`. `fs.rename` replaces an existing target, so the temp-file-then-rename atomic save in M2 works.
 
+Plain Lua in the same backend, same folder:
+
+| Call | Result |
+| --- | --- |
+| `os.getenv("APPDATA")` | works |
+| `io.open(p, "wb")`, `f:write(...)` with `\0` and `\r\n`, `io.open(p, "rb")`, `r:read("*a")` | byte-exact round trip |
+| `os.rename(tmp, p)` with `p` already existing | **fails**: `...\probe2.txt: File exists`. C `rename` on Windows does not replace. |
+
+So the M2 atomic save must replace the target with Millennium's `fs.rename`, not `os.rename` (or remove the target first, which leaves a window with no file).
+
 ## Open question 6: HTTPS and self-replacement (answered)
 
 - `http.get("https://api.github.com/repos/attl8d/steam-discreet/releases", {headers=...})` returned HTTP 200 with `[]` (no releases yet). A first try minutes earlier returned 404, and an unauthenticated check of the repo from PowerShell also returned 404 then, so the repo was probably private at that time. If the repo is private, the updater needs a token.

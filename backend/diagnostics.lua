@@ -58,6 +58,34 @@ function sd_diag_probe()
     table.insert(report.writes, try_write_dir(fs.join(millennium.steam_path(), "steam-discreet-probe")))
     fs.remove_all(fs.join(millennium.steam_path(), "steam-discreet-probe"))
 
+    -- Plain Lua io/os, as used by the M2 tag store.
+    local stdio = { os_getenv_appdata = os.getenv("APPDATA") ~= nil, has_io = type(io) == "table" }
+    if appdata and type(io) == "table" then
+        local dir = fs.join(appdata, "SteamDiscreet")
+        local p = dir .. "\\probe.txt"
+        local f, oerr = io.open(p, "wb")
+        if f then
+            stdio.write = f:write("io probe \0 binary\r\n") and "ok" or "error"
+            f:close()
+            local r = io.open(p, "rb")
+            local content = r and r:read("*a")
+            if r then r:close() end
+            stdio.read_back = content == "io probe \0 binary\r\n"
+            local q = io.open(dir .. "\\probe2.txt", "wb")
+            if q then q:write("second"); q:close() end
+            local ok, rerr = os.rename(dir .. "\\probe2.txt", p)
+            stdio.os_rename_over_existing = ok and true or ("error: " .. tostring(rerr))
+            local r2 = io.open(p, "rb")
+            stdio.after_rename = r2 and r2:read("*a") == "second"
+            if r2 then r2:close() end
+            os.remove(p)
+            os.remove(dir .. "\\probe2.txt")
+        else
+            stdio.open = "error: " .. tostring(oerr)
+        end
+    end
+    report.stdio = stdio
+
     local res, herr = http.get("https://api.github.com/repos/attl8d/steam-discreet/releases",
         { headers = { ["User-Agent"] = "steam-discreet", ["Accept"] = "application/vnd.github+json" } })
     if res then
