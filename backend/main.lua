@@ -1,9 +1,13 @@
 -- Steam Discreet backend entry point.
--- Lifecycle only. Tag storage (M2), patch loading from hooks/ (M5) and the
--- updater (M6) are added by their own milestones; see docs/PLAN.md.
+-- Lifecycle, plus the tag storage RPC functions (M2). Patch loading from
+-- hooks/ (M5) and the updater (M6) are added by their own milestones; see
+-- docs/PLAN.md.
 
 local logger     = require("logger")
 local millennium = require("millennium")
+
+-- Registers the frontend-callable tags_* functions as globals.
+require("tagstore.rpc")
 
 local M = {}
 
