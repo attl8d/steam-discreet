@@ -100,6 +100,17 @@ local function failure(code, message, acct)
     return result
 end
 
+--- A path for keeping an unreadable file aside that never replaces an earlier
+--- one: `.unreadable`, then `.unreadable2`, `.unreadable3`, ...
+function Store:free_corrupt_path(files)
+    if not self.fsio.exists(files.corrupt) then return files.corrupt end
+    for i = 2, 99 do
+        local candidate = files.corrupt .. i
+        if not self.fsio.exists(candidate) then return candidate end
+    end
+    return nil
+end
+
 --- Try backups newest first. Returns parse result and path of the first usable
 --- one, or a "newer" result if a newer-format backup is found first.
 function Store:find_backup(files)
@@ -179,9 +190,11 @@ function Store:open(account)
     -- Recover from the backup.
     acct.state, acct.set = STATE_RECOVERED, backup.set
     local why = main.status == "missing" and "was missing" or ("could not be read (" .. (main.reason or "") .. ")")
-    acct.notice = "Your tag list " .. why .. ", so it was restored from a backup with "
+    local notice = "Your tag list " .. why .. ", so it was restored from a backup with "
         .. set_count(backup.set) .. " games."
-    acct.notice_delivered = false
+    if notice ~= acct.notice then
+        acct.notice, acct.notice_delivered = notice, false
+    end
     self:log("warn", "main tag file " .. why .. "; restored from " .. backup_path)
 
     if main.status ~= "read_error" then
@@ -189,7 +202,12 @@ function Store:open(account)
         -- successful save writes the main file anyway.
         local ok, err = true, nil
         if main.status ~= "missing" then
-            ok, err = self.fsio.rename(files.main, files.corrupt)
+            local aside = self:free_corrupt_path(files)
+            if aside then
+                ok, err = self.fsio.rename(files.main, aside)
+            else
+                ok, err = false, "too many unreadable files kept aside"
+            end
         end
         if ok then ok, err = self.fsio.copy(backup_path, files.main) end
         if ok then
@@ -257,6 +275,12 @@ function Store:commit(acct, new_set, opts)
     if on_disk.status == "read_error" then
         return failure("write_failed", "Cannot read the current tag file before saving: " .. on_disk.reason, acct)
     end
+    if on_disk.status == "ok" and acct.state == STATE_RECOVERED then
+        -- The main file was unreadable at load (for example locked for a moment)
+        -- but reads fine now. It may be newer than the backup the edit was based
+        -- on, so never overwrite it from here; callers reload first.
+        return failure("write_failed", "The tag file changed since it was loaded. Try again.", acct)
+    end
     local move_aside = false
     if on_disk.status == "invalid" then
         if acct.state == STATE_RECOVERED or opts.replace_unreadable then
@@ -290,7 +314,9 @@ function Store:commit(acct, new_set, opts)
     if on_disk.status == "ok" then
         warnings = self:rotate_backups(files)
     elseif move_aside then
-        local moved, merr = self.fsio.rename(files.main, files.corrupt)
+        local aside = self:free_corrupt_path(files)
+        local moved, merr = false, "too many unreadable files kept aside"
+        if aside then moved, merr = self.fsio.rename(files.main, aside) end
         if not moved then
             self.fsio.remove(files.tmp)
             return failure("write_failed", "Could not move the unreadable tag file aside: " .. tostring(merr), acct)
@@ -315,6 +341,12 @@ end
 local function with_account(self, account, fn)
     local acct = self:get(account)
     if not acct then return failure("bad_account", "Not a Steam account ID") end
+    if acct.state ~= STATE_OK then
+        -- Anything but a clean load is re-read before an edit, so an edit is
+        -- never based on a backup while a readable, newer main file exists.
+        self:open(acct.id)
+        acct = self.accounts[acct.id]
+    end
     return fn(acct)
 end
 

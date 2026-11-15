@@ -58,17 +58,21 @@ function M.copy(from, to)
     return true
 end
 
+-- Millennium's fs.remove and fs.create_directories return `false, message` on
+-- failure and a bare `false` when there was nothing to do (filesystem.cc at
+-- 6522c24), so failure is detected by the message, not by nil.
 function M.remove(path)
-    local ok, err = fs.remove(path)
-    if ok == nil then return false, err or "remove failed" end
+    local _, err = fs.remove(path)
+    if err ~= nil then return false, err end
     return true
 end
 
 ---@return boolean ok
 ---@return string|nil err
 function M.ensure_dir(path)
-    local ok, err = fs.create_directories(path)
-    if ok == nil then return false, err or "could not create directory" end
+    local _, err = fs.create_directories(path)
+    if err ~= nil then return false, err end
+    if not fs.is_directory(path) then return false, "not a directory" end
     return true
 end
 

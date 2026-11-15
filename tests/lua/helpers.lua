@@ -13,8 +13,9 @@ end
 
 -- Millennium's `fs` module wraps std::filesystem (src/lua_host/api/filesystem.cc).
 -- This stub reproduces the return conventions the backend relies on, using
--- real files: rename replaces an existing target, copy overwrites, remove
--- returns false for a missing path, create_directories is recursive.
+-- real files: rename replaces an existing target, copy overwrites.
+-- remove and create_directories return a boolean ("did something") plus an
+-- error message only on failure, exactly like Lua_Remove / Lua_CreateDirectories.
 function M.make_fs_stub()
     local fs = {}
     function fs.exists(path) return sh_ok("test -e " .. shell_quote(path)) end
@@ -22,7 +23,7 @@ function M.make_fs_stub()
     function fs.create_directories(path)
         if fs.is_directory(path) then return false end
         if sh_ok("mkdir -p " .. shell_quote(path) .. " 2>/dev/null") then return true end
-        return nil, "mkdir failed"
+        return false, "mkdir failed"
     end
     function fs.rename(from, to)
         local ok, err = os.rename(from, to)
@@ -43,7 +44,7 @@ function M.make_fs_stub()
     function fs.remove(path)
         if not fs.exists(path) then return false end
         local ok, err = os.remove(path)
-        if not ok then return nil, err end
+        if not ok then return false, err end
         return true
     end
     return fs

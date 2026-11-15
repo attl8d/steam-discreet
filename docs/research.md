@@ -29,6 +29,10 @@ Millennium `main` at commit `6522c24` (same as docs/PLAN.md), read on
   which replaces an existing target on Windows (MoveFileExW with
   REPLACE_EXISTING). `os.rename` does not, so the store renames through `fs`.
   `fs.copy` uses `overwrite_existing`. Both return `nil, message` on failure.
+  `fs.remove` and `fs.create_directories` differ: they return the std::filesystem
+  boolean (`false` also means "nothing to do", e.g. the folder already exists)
+  plus a message only on failure. So their failure is detected by the message,
+  never by `nil`.
 
 ## Tag storage location (open question 5: unanswered)
 
@@ -50,6 +54,8 @@ is not usable, change only `root()` and record the reason here.
 
 One file per account, `tags-<SteamID64>.txt`, plus `.bak1` (newest) to `.bak5`
 and, only after a recovery, `.unreadable` (the file that could not be read).
+A later recovery never replaces an earlier one: it uses `.unreadable2`,
+`.unreadable3` and so on.
 
 ```text
 steam-discreet-tags 1

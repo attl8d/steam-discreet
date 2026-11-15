@@ -335,6 +335,64 @@ describe("tagstore.store (real files)", function()
         assert.are.equal("1,2", new_store():open(ACCOUNT).ids)
     end)
 
+    it("never lets an edit based on a backup overwrite a main file that was only briefly unreadable", function()
+        local s = new_store()
+        s:add(ACCOUNT, set_of(10))
+        s:add(ACCOUNT, set_of(20))
+        s:add(ACCOUNT, set_of(30)) -- main {10,20,30}, bak1 {10,20}
+
+        local real = require("tagstore.fsio")
+        local flaky = {}
+        for k, v in pairs(real) do flaky[k] = v end
+        local fail_once = true
+        flaky.read = function(path)
+            if fail_once and path == files.main then
+                fail_once = false
+                return nil, "sharing violation"
+            end
+            return real.read(path)
+        end
+
+        local s2 = new_store(flaky)
+        local r = s2:open(ACCOUNT)
+        assert.are.equal("recovered", r.state)
+        assert.are.equal("10,20", r.ids)
+
+        local after = s2:add(ACCOUNT, set_of(40))
+        assert.is_true(after.ok)
+        assert.are.equal("10,20,30,40", after.ids)
+        assert.are.equal("10,20,30,40", new_store():open(ACCOUNT).ids)
+    end)
+
+    it("keeps every unreadable file aside, never replacing an earlier one", function()
+        local s = new_store()
+        s:add(ACCOUNT, set_of(1))
+        s:add(ACCOUNT, set_of(2))
+        helpers.write_file(files.main, "first broken")
+        new_store():open(ACCOUNT)
+        helpers.write_file(files.main, "second broken")
+        new_store():open(ACCOUNT)
+        assert.are.equal("first broken", helpers.read_file(files.corrupt))
+        assert.are.equal("second broken", helpers.read_file(files.corrupt .. "2"))
+    end)
+
+    it("detects a failed mkdir from Millennium's false-plus-message return", function()
+        local fs = require("fs")
+        local real_mkdir = fs.create_directories
+        fs.create_directories = function() return false, "Access is denied." end
+        local r = new_store():open(ACCOUNT)
+        fs.create_directories = real_mkdir
+        assert.is_false(r.ok)
+        assert.are.equal("unavailable", r.error)
+        assert.is_truthy(r.message:match("Access is denied"))
+    end)
+
+    it("treats an already existing folder as fine", function()
+        assert(require("fs").create_directories(dir))
+        assert.is_false(require("fs").create_directories(dir)) -- false, no message
+        assert.is_true(new_store():open(ACCOUNT).ok)
+    end)
+
     it("reports an unusable storage folder", function()
         local s = new_store(failing("ensure_dir", nil, "access denied"))
         local r = s:open(ACCOUNT)
