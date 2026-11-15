@@ -123,8 +123,11 @@ end
 function M.mkdir(path)
     local fs = lib("fs")
     if fs and fs.create_directories then
-        local ok, err = fs.create_directories(path)
-        if ok == nil then return nil, tostring(err) end
+        -- Returns false when the folder already exists and false, message on
+        -- error (filesystem.cc, Lua_CreateDirectories), so the message is
+        -- what signals failure.
+        local _, err = fs.create_directories(path)
+        if err ~= nil then return nil, tostring(err) end
         return true
     end
     return nil, "fs module unavailable"

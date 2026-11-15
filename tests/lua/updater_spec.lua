@@ -247,10 +247,22 @@ describe("updater", function()
         it("does not swap if the running version cannot be backed up", function()
             publish(p, "0.2.0", star("v0.2.0"))
             u:check()
-            p.fail_write[DIR .. "/previous.star.tmp.tmp"] = true
             p.fail_write[DIR .. "/previous.star.tmp"] = true
             assert.are.equal("error", u:apply_staged().result)
             assert.are.equal(star("v0.1.0"), p.files[LIVE])
+        end)
+
+        it("records a swap that was interrupted before its metadata was cleared", function()
+            publish(p, "0.2.0", star("v0.2.0"))
+            u:check()
+            -- crash right after the rename of staged.star onto the plugin file
+            p.files[LIVE] = p.files[DIR .. "/staged.star"]
+            p.files[DIR .. "/staged.star"] = nil
+            local r = u:apply_staged()
+            assert.are.equal("already_applied", r.result)
+            assert.is_nil(p.files[DIR .. "/staged.json"])
+            assert.are.equal("0.2.0", u:status().last_applied.to)
+            assert.is_nil(u:status().last_apply_error)
         end)
 
         it("leaves the update staged when the plugin was installed under another name", function()
@@ -290,6 +302,44 @@ describe("updater", function()
             assert.are.equal(star("v0.1.0"), p.files[LIVE])
             publish(p, "0.2.1", star("v0.2.1"))
             assert.are.equal("staged", u:check().result)
+        end)
+
+        it("refuses a second rollback that would re-enable the bad version", function()
+            update_to_020()
+            u:request_rollback()
+            u:apply_staged()
+            u = updater.new({ platform = p, current_version = "0.1.0" })
+            local r = u:request_rollback()
+            assert.are.equal("error", r.result)
+            assert.truthy(r.detail:find("not older"))
+            assert.are.equal("0.2.0", u:status().skip_version)
+            assert.is_nil(u:status().staged_version)
+            assert.are.equal("skipped", u:check().result)
+        end)
+
+        it("keeps a manual rollback from being undone at the next start", function()
+            update_to_020()
+            -- the user copies previous.star over the plugin file by hand
+            p.files[LIVE] = p.files[DIR .. "/previous.star"]
+            u = updater.new({ platform = p, current_version = "0.1.0" })
+            assert.are.equal("0.2.0", u:note_startup())
+            assert.are.equal("skipped", u:check().result)
+            assert.are.equal(star("v0.1.0"), p.files[LIVE])
+        end)
+
+        it("does not skip anything on a normal start after an update", function()
+            update_to_020()
+            assert.is_nil(u:note_startup())
+            assert.is_nil(u:status().skip_version)
+        end)
+
+        it("does not treat a start after a rollback as a manual rollback", function()
+            update_to_020()
+            u:request_rollback()
+            u:apply_staged()
+            u = updater.new({ platform = p, current_version = "0.1.0" })
+            assert.is_nil(u:note_startup())
+            assert.are.equal("0.2.0", u:status().skip_version)
         end)
 
         it("reports when there is nothing to roll back to", function()

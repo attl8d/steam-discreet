@@ -87,7 +87,6 @@ function Updater:paths()
         staged_meta = self.p.join(dir, "staged.json"),
         previous = self.p.join(dir, "previous.star"),
         previous_meta = self.p.join(dir, "previous.json"),
-        previous_tmp = self.p.join(dir, "previous.star.tmp"),
         state = self.p.join(dir, "state.json"),
     }
     return self._paths
@@ -292,6 +291,22 @@ function Updater:apply_staged()
     if not paths then return { result = "error", detail = perr } end
     if not self.p.exists(paths.staged_meta) then return { result = "nothing" } end
 
+    -- A crash between the swap and clearing staged.json leaves metadata for a
+    -- file that is already live. Record it as applied instead of an error.
+    local pending = self:read_json(paths.staged_meta)
+    if pending and not self.p.exists(paths.staged) and type(pending.sha256) == "string" then
+        local live_now = self.p.read_file(paths.live)
+        if live_now and sha256.hex(live_now) == pending.sha256 then
+            self:remove(paths.staged_meta)
+            self:save_state({
+                last_apply_error = false,
+                last_applied = { from = self.current, to = pending.version, at = self.p.now(),
+                    rollback = pending.rollback == true, recovered = true },
+            })
+            return { result = "already_applied", to = pending.version }
+        end
+    end
+
     local meta, verr = self:verified_stage()
     if not meta then
         self:remove(paths.staged)
@@ -311,8 +326,7 @@ function Updater:apply_staged()
 
     -- Keep the running version for rollback, unless this apply is the rollback itself.
     if not meta.rollback then
-        local ok, err = self:write(paths.previous_tmp, live)
-        if ok then ok, err = self:rename(paths.previous_tmp, paths.previous) end
+        local ok, err = self:write(paths.previous, live)
         if ok then
             ok, err = self:write_json(paths.previous_meta, { version = self.current, saved_at = self.p.now() })
         end
@@ -351,6 +365,10 @@ function Updater:request_rollback()
     if not meta or not data or not M.looks_like_star(data) or not semver.parse(meta.version) then
         return { result = "error", detail = "no previous version to roll back to" }
     end
+    if semver.compare(meta.version, self.current) >= 0 then
+        return { result = "error", detail = ("the saved previous version (%s) is not older than the running one (%s)")
+            :format(meta.version, self.current) }
+    end
     self:remove(paths.staged_meta)
     local ok, err = self:write(paths.staged, data)
     if ok then
@@ -362,6 +380,20 @@ function Updater:request_rollback()
     self:save_state({ skip_version = self.current })
     self.p.log("info", ("rollback to %s staged; it loads at the next Steam start"):format(meta.version))
     return { result = "rollback_staged", to = meta.version }
+end
+
+-- Called at startup, without network. If the last update installed a version
+-- newer than the one now running, and that update was not a rollback, the
+-- user put an older file back by hand: skip the newer version so the next
+-- check does not reinstall it.
+function Updater:note_startup()
+    local state = self:state()
+    local applied = state.last_applied
+    if type(applied) ~= "table" or applied.rollback or type(applied.to) ~= "string" then return nil end
+    if semver.compare(applied.to, self.current) ~= 1 or state.skip_version == applied.to then return nil end
+    self:save_state({ skip_version = applied.to })
+    self.p.log("info", ("running %s after %s was installed; skipping %s"):format(self.current, applied.to, applied.to))
+    return applied.to
 end
 
 -- Allow the skipped version again (after a fixed release, or by hand).

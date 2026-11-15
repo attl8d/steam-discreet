@@ -54,6 +54,40 @@ describe("backend/main.lua", function()
         assert.are.equal(1, applied)
     end)
 
+    it("keeps loading when the platform module cannot be required", function()
+        package.preload["updater.platform"] = function() error("broken platform") end
+        assert.has_no.errors(function() plugin.on_load() end)
+        package.preload["updater.platform"] = nil
+        assert.are.equal(1, stubs.millennium.ready_calls)
+    end)
+
+    it("notes a manual rollback at startup, before any network check", function()
+        local order = {}
+        package.loaded["updater"] = { new = function()
+            return { note_startup = function() order[#order + 1] = "startup" end,
+                     check = function() order[#order + 1] = "check" end }
+        end }
+        plugin.on_load()
+        plugin.on_frontend_loaded()
+        assert.are.same({ "startup", "check" }, order)
+    end)
+
+    it("exposes status and rollback to the frontend as JSON", function()
+        package.loaded["json"] = { encode = function(v) return "json:" .. tostring(v.result or v.current_version) end }
+        package.loaded["updater"] = { new = function()
+            return { status = function() return { current_version = "0.1.0" } end,
+                     request_rollback = function() return { result = "rollback_staged" } end }
+        end }
+        assert.are.equal("json:0.1.0", _G.steam_discreet_update_status())
+        assert.are.equal("json:rollback_staged", _G.steam_discreet_update_rollback())
+    end)
+
+    it("reports updater errors to the frontend instead of throwing", function()
+        package.loaded["json"] = { encode = function(v) return "json:" .. tostring(v.result) end }
+        package.loaded["updater"] = { new = function() error("boom") end }
+        assert.are.equal("json:error", plugin.update_rollback())
+    end)
+
     it("keeps loading and unloading when the updater throws", function()
         package.loaded["updater"] = { new = function() error("boom") end }
         assert.has_no.errors(function()

@@ -40,6 +40,14 @@ The installed plugin checks this repo's latest release in the background after e
 
 The check calls the GitHub API without a token, so it only works while this repo is public.
 
+### Rolling back
+
+The settings page (T8) will call the backend method `steam_discreet_update_rollback`. It stages the saved previous version, which replaces the current one at the next Steam shutdown, and the current version is then skipped by future checks. A later, higher release is installed as usual.
+
+By hand: quit Steam, copy `<Millennium plugins>/steam-discreet.update/previous.star` over `<Millennium plugins>/steam-discreet.star`, and start Steam. At startup the plugin sees it is older than the version it last installed and skips that version, so the rollback sticks.
+
+To allow a skipped version again, delete `skip_version` from `steam-discreet.update/state.json`.
+
 ## Layout
 
 ```text

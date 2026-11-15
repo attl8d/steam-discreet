@@ -32,7 +32,7 @@ off by default (`luaJIT_setmode ... LUAJIT_MODE_OFF`).
 | `http.get(url, opts)` / `http.request` | `api/http.cc` | Returns `{status, body, headers}` or `nil, err`. opts: `headers`, `timeout` (s, default 30), `follow_redirects` (default true), `verify_ssl` (default true), `user_agent`. Body is pushed with `lua_pushstring`, so it **stops at the first NUL byte**: fine for JSON, wrong for binaries. Body capped at 64 MB. |
 | `http.download(url, path, opts)` | `api/http.cc` | Streams to a file. **Not in the Lua type stubs** (`api/types/http.lua`). Returns `{success, status, bytes_written}`. Does **not** fail on HTTP 4xx/5xx (no `CURLOPT_FAILONERROR`), so the caller must check `status`. Deletes the file only on a curl error. No timeout unless one is passed. |
 | `fs.rename(from, to)` | `api/filesystem.cc` | `std::filesystem::rename`, which replaces an existing target on Windows (`os.rename` does not). |
-| `fs.create_directories(path)` | `api/filesystem.cc` | Returns `false` if it already exists, `nil, err` on error. |
+| `fs.create_directories(path)` | `api/filesystem.cc` | Returns `true` if created, `false` if it already exists, and `false, message` on error (never `nil`), so the second value is what signals failure. |
 | `utils.getenv(name)` | `api/utils.cc` | `std::getenv`. |
 | `utils.hash(str)` | `api/utils.cc` | Integer hash only. There is **no SHA-256** anywhere in the Lua API, so the plugin carries its own (`backend/updater/sha256.lua`, ~20 ms per 100 KB with JIT off). |
 | `millennium.get_install_path()` | `api/millennium.cc` | RPC to the parent. |
@@ -49,8 +49,14 @@ off by default (`luaJIT_setmode ... LUAJIT_MODE_OFF`).
 - RPCs are handled one at a time on the child's event loop. While an HTTP call
   is in flight, frontend calls into this backend wait. Hence the short
   timeouts (10 s API, 60 s download; the package is ~26 KB).
-- `on_unload` runs on `SHUTDOWN`; the parent waits 5 s. It is not called if
-  Steam is killed or crashes.
+- `on_unload` runs on `SHUTDOWN` (the parent waits 5 s), and also when the
+  backend's socket closes because Steam died (`main.cc`, `handle_shutdown`
+  after `rpc.run` returns). Only a hard kill of the backend process itself
+  skips it. A swap after a Steam crash is harmless: it is a single rename and
+  nothing is reading the file.
+- Frontend calls into the backend name a **global** Lua function, or
+  `table:method` on a global table (`main.cc`, `handle_evaluate`). The
+  plugin's returned module table is not searched.
 
 ### Plugin files (`src/engine/plugin_manager.cc`, `src/engine/star_parser.cc`, `src/system/environment.cc`)
 
@@ -89,5 +95,6 @@ off by default (`luaJIT_setmode ... LUAJIT_MODE_OFF`).
    through Steam's network settings (redirect to `release-assets.githubusercontent.com`).
 4. `on_unload` runs on a normal Steam exit and the swap completes within 5 s.
 5. After the swap, the next start loads the new version, and a rollback restores the old one.
+   Also check that `steam_discreet_update_status` and `steam_discreet_update_rollback` can be called from the frontend.
 6. Paths with non-ASCII characters: `io.open` and the `fs` module both take
    narrow strings, so a non-ASCII Millennium install path may fail on Windows.

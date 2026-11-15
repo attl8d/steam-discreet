@@ -83,6 +83,17 @@ describe("updater.platform", function()
         assert.is_false(platform.start_background(function() end))
     end)
 
+    it("treats an error message from fs.create_directories as failure", function()
+        package.loaded["fs"] = { create_directories = function() return false, "Access is denied" end }
+        local ok, err = platform.mkdir("X:/nope")
+        assert.is_nil(ok)
+        assert.are.equal("Access is denied", err)
+        package.loaded["fs"].create_directories = function() return false end -- already exists
+        assert.is_true(platform.mkdir("X:/there"))
+        package.loaded["fs"].create_directories = function() return true end
+        assert.is_true(platform.mkdir("X:/new"))
+    end)
+
     it("reads and writes binary files", function()
         local path = os.tmpname()
         local data = "STAR\0\1\2\255"
