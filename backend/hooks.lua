@@ -7,7 +7,8 @@
 -- What Millennium does with the table (src/instrumentation/loopback/src/engine.rs
 -- at v3.6.3, see docs/research.md): `file` patterns of every plugin are compiled
 -- into one Rust RegexSet, and one invalid `file` pattern discards ALL plugins'
--- patches. `find` takes the first match only; each transform's `match` is
+-- patches; an invalid `find` misaligns every later patch. `find` takes the
+-- first match only; each transform's `match` is
 -- replace_all'd inside that match. In `replace`, `\N` becomes Rust `$N` and a
 -- literal `$` is escaped. Regex syntax itself cannot be checked here; the
 -- fixture harness (tests/hooks) does that in CI.
@@ -17,7 +18,13 @@ local M = {}
 M.FORMAT_VERSION = 1
 M.MARKER_GLOBAL = "__steamDiscreetHooks"
 
-local HOOK_KEYS = { id = true, description = true, placeholder = true, file = true, find = true, transforms = true }
+local HOOK_KEYS = {
+    id = true, description = true, placeholder = true, runs = true, file = true, find = true, transforms = true,
+}
+-- startup: the patched code runs on every Steam start, so not seeing it means
+-- the hook is broken. on_demand: it runs only when the user opens something
+-- (a menu, a view), so not seeing it yet means nothing.
+M.RUNS = { startup = true, on_demand = true }
 local TRANSFORM_KEYS = { match = true, replace = true }
 
 -- JavaScript the `#{{marker}}` token expands to: records in the page that this
@@ -36,6 +43,17 @@ local function unknown_key(t, allowed)
         if not allowed[k] then return tostring(k) end
     end
     return nil
+end
+
+-- A Lua list with no holes and no other keys. ipairs would silently stop at a
+-- hole or skip string keys, and a mistyped list would then load as empty.
+local function is_sequence(t)
+    local n = 0
+    for _ in pairs(t) do n = n + 1 end
+    for i = 1, n do
+        if t[i] == nil then return false end
+    end
+    return true
 end
 
 local function count_plain(s, needle)
@@ -82,10 +100,14 @@ local function validate_hook(h, index, seen_ids)
     if h.placeholder ~= nil and type(h.placeholder) ~= "boolean" then
         return nil, "placeholder must be true or false", label
     end
+    if not M.RUNS[h.runs] then return nil, 'runs must be "startup" or "on_demand"', label end
     if not is_nonempty_string(h.file) then return nil, "file pattern is required", label end
     if not is_nonempty_string(h.find) then return nil, "find pattern is required", label end
-    if type(h.transforms) ~= "table" or #h.transforms == 0 then
+    if type(h.transforms) ~= "table" or next(h.transforms) == nil then
         return nil, "at least one transform is required", label
+    end
+    if not is_sequence(h.transforms) then
+        return nil, "transforms must be a plain list { {...}, {...} } with no gaps or named keys", label
     end
 
     local transforms, markers = {}, 0
@@ -112,13 +134,17 @@ local function validate_hook(h, index, seen_ids)
         id = h.id,
         description = h.description,
         placeholder = h.placeholder == true,
+        runs = h.runs,
         file = h.file,
         find = h.find,
         transforms = transforms,
     }
 end
 
--- Runs the data file with an empty environment so it can hold nothing but data.
+-- Runs the data file with an empty environment: no globals and no library
+-- functions, so it cannot reach the file system, Millennium or Steam. (String
+-- methods and loops still work, so it is a guard against mistakes, not a
+-- sandbox against hostile code.)
 local function run_definitions(chunk)
     if setfenv then setfenv(chunk, {}) end
     local ok, result = pcall(chunk)
@@ -131,6 +157,13 @@ local function load_chunk(module_name)
     -- preload function; on disk (specs, scripts) it is a normal file.
     local chunk = package.preload[module_name]
     if chunk then return chunk end
+    -- Packed (this module itself came from preload) but the data file is
+    -- missing: Millennium drops a file that fails to compile, and its error
+    -- message with it. Never fall back to a stray copy on disk.
+    if package.preload["hooks"] then
+        return nil, module_name .. ".lua is missing from the package or did not compile "
+            .. "(Millennium does not report why); run bun run check"
+    end
     local path, search_err = package.searchpath(module_name, package.path)
     if not path then return nil, search_err end
     local loaded, load_err = loadfile(path)
@@ -158,6 +191,10 @@ function M.load(definitions)
 
     if type(definitions) ~= "table" or type(definitions.hooks) ~= "table" then
         result.error = "hook_definitions must return { version = ..., hooks = { ... } }"
+        return result
+    end
+    if not is_sequence(definitions.hooks) then
+        result.error = "hook_definitions: hooks must be a plain list { {...}, {...} } with no gaps or named keys"
         return result
     end
     if definitions.version ~= M.FORMAT_VERSION then
@@ -200,7 +237,9 @@ function M.manifest(loaded)
     local expected = {}
     for _, h in ipairs(loaded.hooks) do
         if not h.placeholder then
-            expected[#expected + 1] = { id = h.id, description = h.description, file = h.file, find = h.find }
+            expected[#expected + 1] = {
+                id = h.id, description = h.description, runs = h.runs, file = h.file, find = h.find,
+            }
         end
     end
     local rejected = {}

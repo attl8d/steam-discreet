@@ -24,6 +24,7 @@ return {
             id = "sidebar-visibility",          -- kebab-case, unique
             description = "What it targets, in words.",
             placeholder = false,                -- true: example only, never sent to Millennium
+            runs = "startup",                   -- or "on_demand"; see below
             file = [=[chunk~[0-9a-f]+\.js]=],   -- matched against the script's file name
             find = [=[...]=],                   -- the anchor; Millennium patches its FIRST match only
             transforms = {
@@ -34,7 +35,16 @@ return {
 }
 ```
 
-The file runs with no globals, so it can only hold tables and strings. If it fails to load, every hook is disabled and Steam runs unpatched. If one hook is invalid, only that hook is left out and the self-check reports it as rejected.
+The file runs with no globals or library functions, so keep it to tables and strings. If it fails to load, or `hooks` has gaps or named keys, every hook is disabled, Steam runs unpatched and the self-check warns. If one hook is invalid (including gaps or named keys in its `transforms`), only that hook is left out and the self-check reports it as rejected.
+
+### `runs` and the self-check
+
+The `#{{marker}}` fires only when the patched code runs, so the self-check can only see a hook after its code has run.
+
+- `startup`: the patched code runs on every Steam start (for example the Library's own filtering). If it has not been seen when the grace period ends, the hook is `missing` and the toggle warns.
+- `on_demand`: the code runs only when the user opens something (a context menu, a view not opened yet). Until then it is `not-seen`, which is not a failure.
+
+Pick `startup` only when the live client shows the code running at every start. If unsure, use `on_demand`: a wrong `startup` gives a warning at every start, and a wrong `on_demand` only hides a failure until the surface is opened.
 
 In `replace`:
 
@@ -64,7 +74,7 @@ For every hook, `bun run test` checks:
 5. Every attached fixture doubled: the harness reports the anchor as ambiguous, Millennium's behaviour patches only the first copy, and the result still parses.
 6. Every file in `_unrelated/` stays unchanged, and a file name that `file` does not select is never touched.
 
-`bun run test:hooks:rust` (also in CI) writes every case with the harness's output and repeats it with the real Rust crate and Millennium's own replacement code. It fails if a pattern does not compile in Rust or any output differs.
+`bun run test:hooks:rust` (also in CI) writes every case with the harness's output and repeats it with the real Rust crate and Millennium's own replacement code. It fails if a pattern does not compile in Rust, any output differs, or a patched file fails the oxc ES-module parse Millennium uses (which would make Millennium revert the whole file).
 
 ## Adding or repairing a hook
 

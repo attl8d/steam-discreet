@@ -2,9 +2,10 @@
 -- Hook definitions: data only. Repairing a hook after a Steam update means
 -- editing the strings in this file and running `bun run check`.
 --
--- This file is loaded by backend/hooks.lua in an empty environment, so it can
--- only build tables and strings: no function calls, no globals. A load error
--- here disables every hook (they fail open); it never stops the plugin.
+-- This file is loaded by backend/hooks.lua in an empty environment: no globals
+-- and no library functions, so keep it to tables and strings. A load error, or
+-- a `hooks` list with gaps or named keys, disables every hook (they fail open
+-- and the self-check warns); it never stops the plugin.
 --
 -- It lives in backend/ rather than hooks/ because Millennium packs only
 -- `backend/**/*.lua` into the .star file and loads each one as a module.
@@ -13,6 +14,9 @@
 --   id           kebab-case, unique. Used by the self-check and fixtures.
 --   description  what the hook targets, in words; shown in the diagnostic report.
 --   placeholder  true for a synthetic example. Never sent to Millennium.
+--   runs         "startup" if the patched code runs on every Steam start, or
+--                "on_demand" if it runs only when the user opens something.
+--                Only an unseen startup hook counts as broken.
 --   file         Rust regex matched against the Steam script's file name.
 --   find         Rust regex; Millennium patches only its FIRST match per file.
 --   transforms   list of { match = <Rust regex>, replace = <text> }, applied
@@ -28,6 +32,7 @@ return {
         {
             id = "placeholder-example",
             placeholder = true,
+            runs = "startup",
             description = "PLACEHOLDER. Synthetic anchor that exists only in tests/hooks/fixtures. "
                 .. "Shows the format until M1 finds real Steam seams; it is never applied to Steam.",
             file = [=[chunk~[0-9a-f]+\.js]=],

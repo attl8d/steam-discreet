@@ -7,16 +7,23 @@
  * overall state for the toggle. It is pure: the caller supplies the manifest,
  * the flags and whether the startup grace period is over.
  *
- * A hook that never reports is treated as broken, and the features that depend
- * on it must stay off (fail open: tagged games show, nothing is blocked).
+ * The marker fires only when the patched code runs, so not seeing it proves
+ * nothing for code that runs on demand (a context menu, a view not opened
+ * yet). Only a `startup` hook that stays unseen after the grace period counts
+ * as missing. Either way, features built on a hook act only once it is
+ * attached (fail open: tagged games show, nothing is blocked).
  */
 
 /** Name of the global the markers write to. Must match hooks.MARKER_GLOBAL in backend/hooks.lua. */
 export const MARKER_GLOBAL = '__steamDiscreetHooks';
 
+/** When the patched code runs: on every Steam start, or only when the user opens something. */
+export type HookRuns = 'startup' | 'on_demand';
+
 export interface ExpectedHook {
 	readonly id: string;
 	readonly description: string;
+	readonly runs: HookRuns;
 	readonly file: string;
 	readonly find: string;
 }
@@ -36,11 +43,12 @@ export interface HookManifest {
 
 /**
  * attached  the patched code has run, so the hook is in place.
- * checking  not seen yet, and the grace period after startup is still running.
- * missing   not seen after the grace period: the anchor most likely moved in a Steam update.
+ * checking  a startup hook not seen yet, and the grace period is still running.
+ * missing   a startup hook not seen running after the grace period. Not a failure for on_demand hooks.
+ * not-seen  an on_demand hook whose code has not run yet. Normal until the user opens that surface.
  * rejected  the definition was refused when the backend loaded it, so Steam was never patched.
  */
-export type HookState = 'attached' | 'checking' | 'missing' | 'rejected';
+export type HookState = 'attached' | 'checking' | 'missing' | 'not-seen' | 'rejected';
 
 export interface HookStatus {
 	readonly id: string;
@@ -81,7 +89,8 @@ export function parseManifest(value: unknown): HookManifest | null {
 	const hooks: ExpectedHook[] = [];
 	for (const h of exp) {
 		if (!isRecord(h) || !isString(h.id) || !isString(h.description) || !isString(h.file) || !isString(h.find)) return null;
-		hooks.push({ id: h.id, description: h.description, file: h.file, find: h.find });
+		if (h.runs !== 'startup' && h.runs !== 'on_demand') return null;
+		hooks.push({ id: h.id, description: h.description, runs: h.runs, file: h.file, find: h.find });
 	}
 	const refused: RejectedHook[] = [];
 	for (const r of rej) {
@@ -103,13 +112,16 @@ export function evaluateSelfCheck(manifest: HookManifest, seen: ReadonlySet<stri
 		if (seen.has(h.id)) {
 			return { id: h.id, state: 'attached', description: h.description, lookingFor: null, reason: null };
 		}
-		const state: HookState = gracePeriodOver ? 'missing' : 'checking';
+		const lookingFor = { file: h.file, find: h.find };
+		if (h.runs === 'on_demand') {
+			return { id: h.id, state: 'not-seen', description: h.description, lookingFor, reason: null };
+		}
 		return {
 			id: h.id,
-			state,
+			state: gracePeriodOver ? 'missing' : 'checking',
 			description: h.description,
-			lookingFor: { file: h.file, find: h.find },
-			reason: gracePeriodOver ? 'patched code never ran; the find pattern probably no longer matches Steam' : null,
+			lookingFor,
+			reason: gracePeriodOver ? 'not seen running since Steam started; its find pattern may no longer match' : null,
 		};
 	});
 	for (const r of manifest.rejected) {

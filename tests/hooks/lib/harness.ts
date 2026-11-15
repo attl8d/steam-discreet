@@ -14,6 +14,7 @@ export interface HookDefinition {
 	readonly id: string;
 	readonly description: string;
 	readonly placeholder: boolean;
+	readonly runs: 'startup' | 'on_demand';
 	readonly file: string;
 	readonly find: string;
 	readonly transforms: readonly { readonly match: string; readonly replace: string }[];

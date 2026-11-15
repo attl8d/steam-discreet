@@ -16,6 +16,7 @@ function hook(overrides: Partial<HookDefinition>): HookDefinition {
 		id: 'broken',
 		description: 'test',
 		placeholder: true,
+		runs: 'startup',
 		file: 'chunk~[a-z]+\\.js',
 		find: 'return t\\.ok\\(t\\.id\\)',
 		transforms: [{ match: 'return (t)', replace: `return ${MARKER},\\1` }],

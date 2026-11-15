@@ -6,6 +6,9 @@
 //!
 //! Usage: cargo run --manifest-path tools/patch-crosscheck/Cargo.toml -- <cases.json>
 
+use oxc_allocator::Allocator;
+use oxc_parser::Parser;
+use oxc_span::SourceType;
 use regex::{Regex, RegexSet};
 use serde::Deserialize;
 use std::process::ExitCode;
@@ -88,6 +91,13 @@ fn apply_scoped(buf: &mut Vec<u8>, from: usize, to: usize, pat: &Regex, rep: &st
     new_to
 }
 
+// syntax.rs `check`, without the error rendering.
+fn syntax_errors(source: &str) -> Vec<String> {
+    let alloc = Allocator::default();
+    let ret = Parser::new(&alloc, source, SourceType::mjs()).parse();
+    ret.errors.iter().map(|e| e.message.to_string()).collect()
+}
+
 // -----------------------------------------------------------------------------
 
 struct Compiled {
@@ -160,6 +170,22 @@ fn main() -> ExitCode {
             eprintln!("FAIL {}: Rust output differs from the bun harness", case.label);
             eprintln!("  rust: {got}");
             eprintln!("  bun:  {}", case.expected);
+        }
+        // A fixture that oxc cannot parse would not tell us anything about Steam.
+        if case.filename.ends_with(".js") {
+            let input_errors = syntax_errors(&case.input);
+            if !input_errors.is_empty() {
+                failures += 1;
+                eprintln!("FAIL {}: fixture does not parse as an ES module: {:?}", case.label, input_errors);
+            }
+        }
+        // Millennium would revert the whole file, dropping every plugin's patches to it.
+        if got != case.input {
+            let errors = syntax_errors(&got);
+            if !errors.is_empty() {
+                failures += 1;
+                eprintln!("FAIL {}: patched output fails Millennium's oxc check: {:?}", case.label, errors);
+            }
         }
     }
     for mc in &input.matches {

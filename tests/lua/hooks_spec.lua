@@ -4,6 +4,7 @@ local function valid_hook(overrides)
     local h = {
         id = "demo-hook",
         description = "demo",
+        runs = "startup",
         file = [[chunk\.js]],
         find = [[a\(b\)]],
         transforms = { { match = [[b]], replace = [[#{{marker}},b]] } },
@@ -67,6 +68,12 @@ describe("backend/hooks.lua", function()
         { "no transforms", { transforms = {} }, "transform" },
         { "an unknown field", { finds = "x" }, "unknown field 'finds'" },
         { "a non-boolean placeholder", { placeholder = "yes" }, "placeholder" },
+        { "a missing runs", { runs = false }, "runs" },
+        { "an unknown runs value", { runs = "sometimes" }, "runs" },
+        { "transforms with a gap", { transforms = { [1] = { match = "b", replace = "#{{marker}}" },
+            [3] = { match = "c", replace = "c" } } }, "plain list" },
+        { "transforms with a named key", { transforms = { { match = "b", replace = "#{{marker}}" },
+            extra = { match = "c", replace = "c" } } }, "plain list" },
         { "no marker", { transforms = { { match = "b", replace = "b" } } }, "marker" },
         { "#{{self}} without ?.", { transforms = { { match = "b", replace = "#{{marker}},#{{self}}.x" } } }, "?." },
         { "an unknown token", { transforms = { { match = "b", replace = "#{{marker}}#{{selff}}" } } },
@@ -85,6 +92,22 @@ describe("backend/hooks.lua", function()
             assert.are.equal("other", loaded.hooks[1].id)
         end)
     end
+
+    it("disables every hook, with an error, when hooks has a gap or a named key", function()
+        local gap = hooks.load({ version = 1, hooks = { [1] = valid_hook(), [3] = valid_hook({ id = "c" }) } })
+        assert.truthy(gap.error:find("plain list", 1, true))
+        assert.are.same({}, gap.hooks)
+        local named = hooks.load({ version = 1, hooks = { sidebar = valid_hook() } })
+        assert.truthy(named.error:find("plain list", 1, true))
+        local mixed = hooks.load({ version = 1, hooks = { valid_hook(), other = valid_hook({ id = "o" }) } })
+        assert.truthy(mixed.error)
+        assert.are.same({}, hooks.patches(mixed))
+    end)
+
+    it("carries runs into the manifest", function()
+        local m = hooks.manifest(load_one({ runs = "on_demand" }))
+        assert.are.equal("on_demand", m.expected[1].runs)
+    end)
 
     it("rejects duplicate ids", function()
         local loaded = hooks.load({ version = 1, hooks = { valid_hook(), valid_hook() } })
@@ -112,6 +135,15 @@ describe("backend/hooks.lua", function()
             package.preload["hook_definitions"] = function() return { version = 1, hooks = { os = os } } end
             local loaded = hooks.load()
             assert.is_nil(loaded.error)
+            assert.are.same({}, loaded.hooks)
+        end)
+
+        it("never falls back to a file on disk when running from a package", function()
+            -- In a .star, Millennium preloads every backend module, including this one.
+            package.preload["hooks"] = function() return hooks end
+            local loaded = hooks.load()
+            package.preload["hooks"] = nil
+            assert.truthy(loaded.error:find("did not compile", 1, true))
             assert.are.same({}, loaded.hooks)
         end)
 
