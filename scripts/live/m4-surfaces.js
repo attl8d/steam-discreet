@@ -20,7 +20,9 @@
 // It opens Library Home with steam://open/library (which does not change the
 // Games filter). The search step types into the sidebar search through
 // uiStore.SetSearchText, as the search box does, and clears it at the end;
-// the report says whether the filter state matches the start. It never calls
+// the report says whether the filter state matches the start. Clearing the
+// search also clears the sidebar selection and collapses the Hidden section
+// (Steam's ResetSearch; UI state only, as when a user clears the search). It never calls
 // Steam's collection, Hidden or Private write paths; the only stored write is
 // the plugin's tag file, and every game it tagged is untagged at the end,
 // even after a failure.
