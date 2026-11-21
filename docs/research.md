@@ -476,7 +476,7 @@ Read on 21 November 2026 from Valve's public `steamui_websrc_all.zip` for build 
 | Surface | Where the games come from | Covered by `library-visibility` | Backfill |
 | --- | --- | --- | --- |
 | Sidebar, Installed, Favorites, collections | collection `visibleApps` | yes: live on Windows (M1, before the refresh fix) and on the Mac (`m3-cycle.js`, live refresh) | n/a |
-| Library search (sidebar search box) | `uiStore.SetSearchText` swaps `currentAppFilter` for a search filter; the sidebar rows are `GetCollectionList()` collections' `visibleApps.filter(currentAppFilter.Matches)` | yes: exact-name search seen once on Windows in M1 (static, before the refresh fix); the M4 script now runs the tag, reveal, hide, untag cycle on it, result below | n/a |
+| Library search (sidebar search box) | `uiStore.SetSearchText` swaps `currentAppFilter` for a search filter; the sidebar rows are `GetCollectionList()` collections' `visibleApps.filter(currentAppFilter.Matches)` | yes: exact-name search seen once on Windows in M1 (static, before the refresh fix), and the full tag, reveal, hide, untag cycle live on the Mac in M4 (third run below) | n/a |
 | Recent Games shelf (showcase `recent-games`, component `T0`) | `GetCollection(Recent).visibleApps`; `recent` is `allRecentAppsCollection.allApps` with `mru_index`, wrapped like every collection | yes | yes: the shelf maps the whole filtered list |
 | Collection shelves (any other showcase) | `m_fnSort(cs, gQ(eSortBy))`, a memoize-one of `cs.visibleApps.slice().sort(...)`. `gQ` returns a new comparator on every call, so the memo never hits and every render reads `visibleApps` | yes | yes: a one-row grid of the filtered list |
 | "All collections" shelf and the Collections view | tiles (`at` / `dt` in the collection tile module): artwork is the top 13 of `visibleApps` by playtime; the count label (`Ue`) reads `visibleApps` and `GetAppCountWithToolsFilter` in two `useObserver` calls in one component | yes | yes |
@@ -513,7 +513,17 @@ The image and label counts in these two runs covered the whole main window, side
 
 Second run with the script at `3725f15` (output on `live-out/m4-probe` at `3bc79ee`), same build and plugin: `ok: true`, every step clean for three games. 1062090 and 291650 behaved as in the first run. 2706300, picked from Play Next, left the Play Next suggestions (true, false, true, false, true) and its image and label in the main window (1 to 0 and back) at each step.
 
-So **Working and tested on the Mac:** Recent Games, collection shelves and lists, ordinary What's New entries and Play Next (data), and the main window's rendering of them. Exact-name search and the Home/sidebar split are in the third run. **Not seen live:** takeover events (none were showing in either run, and they cannot be produced on demand; same `BIsVisible` filter as ordinary entries). Windows is still to re-confirm.
+Third run with the script at `26b8f7c` (output on `live-out/m4-probe` at `a5201eb`), plugin at main `5927a71`: `ok: true`, `filterRestored: true`, tag file and search box empty at the end. Image and label counts, Home / sidebar, at baseline, tagged with the toggle off, toggle on, toggle off again, untagged:
+
+| Game | Home | Sidebar |
+| --- | --- | --- |
+| 1062090 (Recent Games) | 2 images, 1 label; 0 when hidden; back each time | 1 image, 1 label (its row); 0 when hidden; back |
+| 291650 (What's New) | 1 image, 1 label; 0 when hidden; back | 0 (not in the sidebar's current view) |
+| 2706300 (Play Next) | 0 at baseline: its Play Next card was not rendered (the shelf is lower on Home or virtualised), so Home rendering is not shown for it; the data check passed | 1 image, 1 label; 0 when hidden; back |
+
+Exact-name search on 1062090: in the results at baseline; tagged with the toggle off, not found and 0 images and labels in both areas; toggle on, found (sidebar 1/1); off again, not found; untagged, found. While the search is active the recorded filter has empty filter groups (the Games and Installed options cleared, only the search text set). That is Steam's own behaviour: `uiStore.SetSearchText` starts a text search with a new empty filter (`this.m_currentAppFilter=new u.E6`), and clearing it (`ResetSearch`) restores `collectionsAppFilter`, which the run confirmed (back to the Games and Installed options). Clearing also clears the sidebar selection and collapses the Hidden section, as when a user clears the search.
+
+So **Working and tested on the Mac:** sidebar, collections, Favorites, exact-name Library search, Recent Games and ordinary What's New entries (data and what Home renders), and Play Next (data; its rendered card not seen). **Not seen live:** takeover events (none were showing in either run, and they cannot be produced on demand; same `BIsVisible` filter as ordinary entries). Windows is still to re-confirm.
 
 ## macOS (live, 21 November 2026)
 
