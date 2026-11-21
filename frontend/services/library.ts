@@ -1,7 +1,7 @@
 import type { AccountId } from '../domain/accountId';
 import { parseAppId, type AppId } from '../domain/appId';
 import type { ReactiveSignal } from '../integrations/steam/reactiveSignal';
-import { evaluateSelfCheck, type HookManifest, parseManifest } from './hookStatus';
+import { evaluateSelfCheck, type HookManifest, parseManifest, type SelfCheck } from './hookStatus';
 import type { TagSnapshot, TagStorage } from './tagStorage';
 
 /**
@@ -206,6 +206,13 @@ export class LibraryService {
 
 	getState(): LibraryState {
 		return this.lastState;
+	}
+
+	/** Every hook's status, for the settings page and the diagnostic report. */
+	selfCheck(): SelfCheck {
+		const seen = safely(() => this.port.seenHooks(), new Set<string>());
+		const graceOver = this.started && this.clock.now() - this.startedAt >= this.graceMs;
+		return evaluateSelfCheck(this.manifest ?? FALLBACK_MANIFEST, seen, graceOver);
 	}
 
 	/** Called on every state change. Returns an unsubscribe function. */

@@ -39,6 +39,16 @@ The Mac client works with a locally built Millennium; see "macOS" in [docs/resea
 - Tags are stored in `~/Library/Application Support/SteamDiscreet`.
 - With Homebrew's LuaRocks, `command -v busted` is a shell wrapper, so `test:lua` fails under `luajit`. Run `eval "$(luarocks --lua-version 5.1 path)"` and `luajit ~/.luarocks/lib/luarocks/rocks-5.1/busted/*/bin/busted` instead.
 
+## Settings page
+
+Open Millennium's settings in Steam and choose Steam Discreet. The page works even when every Library hook has failed.
+
+- **Show adult games**: the same switch as the eye icon in the Library sidebar. Off after every Steam start.
+- **Tagged games**: the count, a search over names and App IDs, **Remove** per game, and **Remove all…** with a confirmation. Every save keeps the previous file in the tag backups.
+- **Export and import**: **Export** copies the tag list (App IDs only) to the clipboard and shows it for copying by hand. **Import** takes a pasted export or a plain list of App IDs; **Add to my tags** merges, **Replace…** swaps the whole list after a confirmation.
+- **Hooks and diagnostics**: each hook's status, and **Copy diagnostic report**: plugin, Millennium and Steam build versions, per-hook status, what each hook not attached was looking for, tag storage health and the updater's last results. It holds no game names, App IDs or account, and user folder names in error text are replaced. Paste it into an LLM session with "fix it". Over CDP the same text is `await PLUGIN_LIST['steam-discreet'].sdDiagnostics.report()`.
+- **Updates**: the installed version, the last update check and its error, a pending install, and **Roll back…** (below).
+
 ## Releases and self-update
 
 Bump `version` in `millennium.toml` and `backend/version.lua` (a test keeps them equal), merge, then push a matching tag:
@@ -55,7 +65,7 @@ The check calls the GitHub API without a token, so it only works while this repo
 
 ### Rolling back
 
-The settings page (T8) will call the backend method `steam_discreet_update_rollback`. It stages the saved previous version, which replaces the current one at the next Steam shutdown, and the current version is then skipped by future checks. A later, higher release is installed as usual.
+In the plugin's settings page, under Updates, choose **Roll back…** and confirm. The button appears only while an older previous version is saved and no update is waiting. It calls the backend method `steam_discreet_update_rollback`, which stages the saved previous version; that replaces the current one at the next Steam shutdown, and the current version is then skipped by future checks. A later, higher release is installed as usual.
 
 By hand: quit Steam, copy `<Millennium plugins>/steam-discreet.update/previous.star` over `<Millennium plugins>/steam-discreet.star`, and start Steam. At startup the plugin sees it is older than the version it last installed and skips that version, so the rollback sticks.
 

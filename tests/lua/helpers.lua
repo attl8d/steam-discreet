@@ -78,6 +78,7 @@ local BACKEND_MODULES = {
 local RPC_GLOBALS = {
     "tags_open", "tags_add", "tags_remove", "tags_clear", "tags_export", "tags_import",
     "steam_discreet_update_status", "steam_discreet_update_rollback", "steam_discreet_hook_manifest",
+    "steam_discreet_environment",
 }
 
 function M.reset()

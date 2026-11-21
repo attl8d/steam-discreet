@@ -43,7 +43,8 @@ end
 
 -- Backend methods the frontend can call by name (Millennium looks up a
 -- global function; src/lua_host/main.cc, handle_evaluate). Results are JSON
--- strings so they cross the bridge unchanged. The settings page (T8) uses them.
+-- strings so they cross the bridge unchanged. The settings page uses them
+-- (frontend/services/settings.ts).
 local function as_json(value)
     local ok, json = pcall(require, "json")
     if not ok then return nil end
@@ -62,8 +63,40 @@ function M.update_rollback()
     return as_json(result or { result = "error", detail = err })
 end
 
-rawset(_G, "steam_discreet_update_status", M.update_status)
-rawset(_G, "steam_discreet_update_rollback", M.update_rollback)
+-- Versions for the diagnostic report. Never raises: a value that cannot be
+-- read is left out. Contains no paths, account or tag data.
+function M.environment()
+    local env = { plugin_version = version }
+    local ok, mv = pcall(function() return millennium.version() end)
+    if ok and type(mv) == "string" and mv ~= "" then env.millennium_version = mv end
+    local jit_ok, jit_lib = pcall(require, "jit")
+    if jit_ok and type(jit_lib) == "table" then
+        if type(jit_lib.os) == "string" then env.os = jit_lib.os end
+        if type(jit_lib.arch) == "string" then env.arch = jit_lib.arch end
+    end
+    return env
+end
+
+---@ffi
+---Updater state for the settings page and diagnostic report, as a JSON string.
+---@return string|nil
+function steam_discreet_update_status()
+    return M.update_status()
+end
+
+---@ffi
+---Stage the previous plugin version; it replaces this one at the next Steam start. JSON string.
+---@return string|nil
+function steam_discreet_update_rollback()
+    return M.update_rollback()
+end
+
+---@ffi
+---Plugin and Millennium versions and the OS, for the diagnostic report, as a JSON string.
+---@return string|nil
+function steam_discreet_environment()
+    return as_json(M.environment())
+end
 
 function M.on_load()
     logger:info("Steam Discreet " .. version .. " loaded on Millennium " .. tostring(millennium.version()))

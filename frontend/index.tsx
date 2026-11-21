@@ -3,16 +3,24 @@ import { definePlugin } from 'millennium';
 import { Icon } from './components/Icon';
 import { SettingsContent } from './components/Settings';
 import { steamLibraryPort } from './integrations/steam';
+import { readAppName, readSteamBuild } from './integrations/steam/clientInfo';
 import { tagMenuItem } from './integrations/steam/contextMenu';
 import { revealToggleSlot } from './integrations/steam/revealToggleSlot';
 import { installLibrary, LibraryService } from './services/library';
+import { installSettings, millenniumSettingsBackend, SettingsService } from './services/settings';
 import { millenniumTagRpc, TagStorage } from './services/tagStorage';
 
-const library = new LibraryService(new TagStorage(millenniumTagRpc()), {
+const storage = new TagStorage(millenniumTagRpc());
+const library = new LibraryService(storage, {
 	...steamLibraryPort(),
 	hookManifest: () => backend.steam_discreet_hook_manifest(),
 });
 installLibrary(library);
+const settings = new SettingsService(storage, library, millenniumSettingsBackend(), {
+	steamBuild: () => readSteamBuild(),
+	appName: (appId) => readAppName(appId),
+});
+installSettings(settings);
 // Start now, not in definePlugin, so the signal exists before Steam first
 // computes its Library lists (see services/library.ts).
 library.start();
@@ -36,6 +44,14 @@ export const sdLibrary = {
 	},
 	tagGames: (appIds: readonly number[]) => library.tagGames(appIds),
 	untagGames: (appIds: readonly number[]) => library.untagGames(appIds),
+};
+
+/**
+ * @ffi The diagnostic report, the same text as "Copy diagnostic report" in
+ * settings, so a repair session can read it over CDP (scripts/live/settings-check.js).
+ */
+export const sdDiagnostics = {
+	report: () => settings.diagnosticReport(),
 };
 
 /**
