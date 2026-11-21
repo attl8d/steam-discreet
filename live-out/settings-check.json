@@ -1,0 +1,17 @@
+{
+  "ok": true,
+  "errors": [],
+  "pluginExports": [
+    "default",
+    "sdDiagnostics",
+    "sdLibrary",
+    "sdRevealToggle",
+    "sdShouldHide",
+    "sdTagMenuItem",
+    "__millennium_internal_plugin_name_do_not_use_or_change__"
+  ],
+  "packageCl": "1794536281",
+  "displayNameType": "string",
+  "report": "# Steam Discreet diagnostic report\n\nGenerated: 2026-11-21T18:55:13.149Z\n\n## Versions\n- Plugin: 0.1.0\n- Millennium: v3.6.3\n- Steam client build: 1794536281\n- OS: OSX (arm64)\n\n## Status\n- Overall: ok\n- Tags loaded: yes\n- Tag storage: ok, writable\n\n## Hooks\n- Self-check: ok\n- library-visibility: attached\n- game-context-menu: not seen yet (runs only when that part of Steam is opened)\n  - Looking for file: `(^|[\\\\/])sp\\.js([?]|$)`\n  - Looking for code: `render\\(\\)\\{const ([A-Za-z_$][A-Za-z0-9_$]*)=this\\.GetTargetApps\\(\\),[^;]*;return\\(0,[A-Za-z_$][A-Za-z0-9_$]*\\.jsxs\\)\\([A-Za-z_$][A-Za-z0-9_$.]*,\\{label:[^,]*,children:\\[!this\\.props\\.omitPrimaryAction&&this\\.GetPrimaryActionMenuItem\\([A-Za-z_$][A-Za-z0-9_$]*,[A-Za-z_$][A-Za-z0-9_$]*\\),this\\.props\\.additionalActions,`\n- reveal-toggle: not seen yet (runs only when that part of Steam is opened)\n  - Looking for file: `(^|[\\\\/])sp\\.js([?]|$)`\n  - Looking for code: `\\(0,[A-Za-z_$][A-Za-z0-9_$]*\\.jsx\\)\\(\"div\",\\{className:[A-Za-z_$][A-Za-z0-9_$]*\\(\\)\\.ViewFiltersBar,children:\\(0,[A-Za-z_$][A-Za-z0-9_$]*\\.jsxs\\)\\(\"div\",\\{className:\\(0,[A-Za-z_$][A-Za-z0-9_$]*\\.A\\)\\([A-Za-z_$][A-Za-z0-9_$]*\\(\\)\\.Filters,[A-Za-z_$][A-Za-z0-9_$]*&&[A-Za-z_$][A-Za-z0-9_$]*\\(\\)\\.Disabled\\),children:\\[`\n\n## Updates\n- Source: attl8d/steam-discreet\n- Last check: 2026-11-21T18:55:03.000Z, error\n- Last check error: no published release found (HTTP 404; the repo may be private or have no releases)\n\nRepair guide: CLAUDE.md in https://github.com/attl8d/steam-discreet",
+  "clipboardApi": true
+}
