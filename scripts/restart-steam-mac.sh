@@ -7,7 +7,7 @@
 # remove) `.cef-enable-remote-debugging` beside steam_osx, so there is no flag
 # file to manage by hand as on Windows.
 #
-#   scripts/restart-steam-mac.sh            # Millennium output is discarded
+#   scripts/restart-steam-mac.sh            # Millennium output is discarded (needs bun)
 #   scripts/restart-steam-mac.sh steam.log  # Millennium and patch-engine output go to steam.log
 set -euo pipefail
 
@@ -33,12 +33,16 @@ fi
 
 nohup "$app/Contents/MacOS/steam_osx" -dev >"$log" 2>&1 &
 
-for t in $(seq 1 120); do
-    if curl -fs --max-time 2 http://127.0.0.1:8080/json 2>/dev/null | grep -q SharedJSContext; then
-        echo "CDP ready after ${t} s"
+# The SharedJSContext target appears a few seconds before Steam's stores are
+# populated, so also wait until the Library has apps before reporting ready.
+cdp="$(cd "$(dirname "$0")" && pwd)/cdp.ts"
+for t in $(seq 1 180); do
+    if curl -fs --max-time 2 http://127.0.0.1:8080/json 2>/dev/null | grep -q SharedJSContext &&
+        bun "$cdp" eval "String(globalThis.appStore?.allApps?.length ?? 0)" 2>/dev/null | grep -q '^[1-9]'; then
+        echo "Steam ready after ${t} s"
         exit 0
     fi
     sleep 1
 done
-echo "CDP not reachable after 120 s" >&2
+echo "Steam not ready after 180 s" >&2
 exit 1
