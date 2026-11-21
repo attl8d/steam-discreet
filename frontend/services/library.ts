@@ -292,7 +292,13 @@ export class LibraryService {
 	private tick(): void {
 		const account = safely(() => this.port.currentAccount(), null);
 		if (account !== null && account !== this.account) {
+			const switched = this.account !== null;
 			this.account = account;
+			// A different account's tags: start hidden again, like a Steam start.
+			if (switched && this.mode !== 'hidden') {
+				this.mode = 'hidden';
+				this.refreshSteam();
+			}
 			this.openFailures = 0;
 			this.nextOpenAt = 0;
 			this.loadError = null;

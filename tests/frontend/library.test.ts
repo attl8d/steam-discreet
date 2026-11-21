@@ -389,6 +389,17 @@ describe('account', () => {
 		clock.advance(1000);
 		expect(backend.calls.filter((c) => c === 'open').length).toBe(1);
 	});
+
+	test('switching account resets the view to hidden and refreshes Steam', async () => {
+		const { lib, port, clock } = await setup([570]);
+		lib.setMode('only');
+		port.events.length = 0;
+		port.account = parseAccountId('76561198000000002') as AccountId;
+		clock.advance(1000);
+		expect(lib.getMode()).toBe('hidden');
+		expect(port.events.slice(0, 2)).toEqual(['clearCounts', 'bump']);
+		await flush();
+	});
 });
 
 describe('seam status', () => {

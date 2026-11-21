@@ -548,7 +548,8 @@ The plugin side: `services/library.ts` holds a `ViewMode` (`hidden`, `all`, `onl
 | Name | Status |
 | --- | --- |
 | `uiStore.GetCollectionList`, `bIsGameListSortedByRecent`, `bIsGameListGroupedByCollection` | Source only, build 1794536281 |
-| `collectionStore.recentAppCollections` | Source only, build 1794536281 (read only by the live check script) |
+| `collectionStore.recentAppCollections`, `appTypeCollections`, `sharedLibrariesCollections` | Source only, build 1794536281. Each is a keepAlive computed whose group collections live on with their own count caches, so `clearCollectionCounts` clears them too (otherwise recent-activity headers keep counts like "This week (2/14)" after a mode change). |
+| `collectionStore.allAppsCollection` (`all-apps-alpha`), `uiStore.currentAppFilter` | Source only, build 1794536281 (live check script) |
 
 Live check: `scripts/live/adult-only-check.js` (with `SD_CHECK_APPID` set to a game in a user collection with recent activity). It switches the mode through the plugin only and never changes Steam's sort, grouping or filter settings.
 

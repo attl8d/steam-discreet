@@ -42,6 +42,9 @@ export const SYSTEM_COLLECTION_IDS = [
 	'hidden',
 ] as const;
 
+/** collectionStore getters returning arrays of collections (sp.js, build 1794536281). */
+export const DERIVED_COLLECTION_LISTS = ['recentAppCollections', 'appTypeCollections', 'sharedLibrariesCollections'] as const;
+
 type Fn = (...args: unknown[]) => unknown;
 
 function get(obj: unknown, key: string): unknown {
@@ -105,6 +108,10 @@ export function clearCollectionCounts(root: unknown = globalThis): number {
 	};
 	for (const id of SYSTEM_COLLECTION_IDS) add(call(store, 'GetCollection', id));
 	for (const c of iterate(get(store, 'userCollections'))) add(c);
+	// Derived group lists the sidebar draws headers from, each a keepAlive
+	// computed whose collections (and their count caches) live on:
+	// recent-activity groups, app-type groups (search) and shared libraries.
+	for (const key of DERIVED_COLLECTION_LISTS) for (const c of iterate(get(store, key))) add(c);
 	for (const c of iterate(fromStorage)) add(c);
 	let cleared = 0;
 	for (const c of seen) {

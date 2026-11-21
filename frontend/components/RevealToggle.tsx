@@ -55,7 +55,7 @@ function FilterIcon({
 			tabIndex={0}
 			onClick={activate}
 			onKeyDown={(e) => {
-				if (e.key === 'Enter' || e.key === ' ') {
+				if ((e.key === 'Enter' || e.key === ' ') && !view.disabled) {
 					e.preventDefault();
 					activate();
 				}

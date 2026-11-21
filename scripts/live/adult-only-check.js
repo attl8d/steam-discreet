@@ -14,7 +14,11 @@
 //   (`recentAppCollections`), whatever the current sort and grouping;
 // - the game is still in each of its collections and in a recent-activity group;
 // - the "18+" icon is in the sidebar icon row and pressed;
-// - native Hidden, Favorites and the filter state are unchanged.
+// - native Hidden, Favorites and the filter state are unchanged;
+// - the header counts (GetAppCountWithToolsFilter with the current filter) of
+//   every recent-activity group and every collection holding the game are not
+//   stale: each equals the count Steam computes after clearing that cache
+//   (ClearAppCounts only empties a cache of numbers).
 // Then it switches back to hidden and checks the counts are as before.
 (async () => {
 	const appid = globalThis.SD_CHECK_APPID;
@@ -29,7 +33,7 @@
 	};
 	const filterState = () => {
 		try {
-			return JSON.stringify(globalThis.uiStore?.m_currentAppFilter?.ToStorageFormat?.() ?? null);
+			return JSON.stringify(globalThis.uiStore?.currentAppFilter?.ToStorageFormat?.() ?? null);
 		} catch (e) {
 			return `unreadable: ${e}`;
 		}
@@ -49,11 +53,26 @@
 		};
 	};
 	const ids = (c) => (c?.visibleApps ?? []).map((a) => a.appid);
+	// Cached header count vs. a fresh one; returns the mismatches.
+	const staleCounts = (collections) => {
+		const f = globalThis.uiStore?.currentAppFilter;
+		const out = [];
+		if (!f) return ['uiStore.currentAppFilter missing'];
+		for (const c of collections) {
+			if (typeof c?.GetAppCountWithToolsFilter !== 'function' || typeof c.ClearAppCounts !== 'function') continue;
+			const cached = c.GetAppCountWithToolsFilter(f);
+			c.ClearAppCounts();
+			const fresh = c.GetAppCountWithToolsFilter(f);
+			if (cached !== fresh) out.push(`${c.id}: header ${cached}, actual ${fresh}`);
+		}
+		return out;
+	};
 	const snap = () => {
 		const all = cs.GetCollection('all-games');
+		const allApps = cs.allAppsCollection; // the sidebar's plain list (all-apps-alpha)
 		const groups = [...(cs.userCollections ?? [])];
 		const recent = [...(cs.recentAppCollections ?? [])];
-		const shown = new Set([...ids(all), ...groups.flatMap(ids), ...recent.flatMap(ids)]);
+		const shown = new Set([...ids(all), ...ids(allApps), ...groups.flatMap(ids), ...recent.flatMap(ids)]);
 		return {
 			mode: lib.getMode(),
 			isVisible: cs.BIsVisible(appid),
@@ -68,6 +87,7 @@
 				const c = recent.find((r) => ids(r).includes(appid));
 				return c ? String(c.displayName ?? c.id) : null;
 			})(),
+			staleCounts: staleCounts([...recent, ...groups.filter((c) => c?.apps?.has?.(appid))]),
 			sortedByRecent: globalThis.uiStore?.bIsGameListSortedByRecent ?? null,
 			groupedByCollection: globalThis.uiStore?.bIsGameListGroupedByCollection ?? null,
 			filter: filterState(),
@@ -107,6 +127,7 @@
 		if (other !== null && !cs.BIsVisible(other)) fail(`untagged game ${other} not visible after switching back`);
 
 		for (const s of [on, off]) {
+			for (const m of s.staleCounts) fail(`${s.mode}: stale count ${m}`);
 			if (s.isHidden !== base.isHidden || s.hiddenSize !== base.hiddenSize) fail('native Hidden changed');
 			if (s.isFavorite !== base.isFavorite) fail('Favorite changed');
 			if (s.filter !== base.filter) fail('filter state changed');

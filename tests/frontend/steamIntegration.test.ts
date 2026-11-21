@@ -45,6 +45,23 @@ describe('clearCollectionCounts', () => {
 		expect(clearCollectionCounts(root)).toBe(3);
 		expect([all.cleared, fav.cleared, user.cleared]).toEqual([1, 1, 1]);
 	});
+	test('clears the recent-activity, app-type and shared-library groups too', () => {
+		const recent = collection();
+		const type = collection();
+		const shared = collection();
+		const root = {
+			collectionStore: {
+				GetCollection: () => null,
+				userCollections: [],
+				collectionsFromStorage: new Map(),
+				recentAppCollections: [recent],
+				appTypeCollections: [type],
+				sharedLibrariesCollections: [shared],
+			},
+		};
+		expect(clearCollectionCounts(root)).toBe(3);
+		expect([recent.cleared, type.cleared, shared.cleared]).toEqual([1, 1, 1]);
+	});
 	test('missing store or renamed members do nothing and never throw', () => {
 		expect(clearCollectionCounts({})).toBe(0);
 		expect(
