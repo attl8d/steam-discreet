@@ -9,6 +9,11 @@
 //
 // --target matches a target title by substring (default "SharedJSContext").
 // `eval` awaits promises and prints the JSON value.
+//
+// Timeouts, so a wedged Steam never hangs a caller: each protocol call fails
+// after CDP_TIMEOUT_MS (default 10000), except the Runtime.evaluate of `eval`,
+// which may run a long live-check script and gets CDP_EVAL_TIMEOUT_MS (default
+// 300000). A closed connection fails every pending call. Failures exit 1.
 // `find` lists every script loaded in the target and prints N characters
 // (default 300) of source around each match of the anchor.
 //
@@ -18,6 +23,8 @@
 export {};
 
 const PORT = Number(process.env.CDP_PORT ?? 8080);
+const TIMEOUT_MS = Number(process.env.CDP_TIMEOUT_MS ?? 10_000);
+const EVAL_TIMEOUT_MS = Number(process.env.CDP_EVAL_TIMEOUT_MS ?? 300_000);
 
 interface Target {
 	id: string;
@@ -28,7 +35,7 @@ interface Target {
 }
 
 async function listTargets(): Promise<Target[]> {
-	const res = await fetch(`http://127.0.0.1:${String(PORT)}/json`);
+	const res = await fetch(`http://127.0.0.1:${String(PORT)}/json`, { signal: AbortSignal.timeout(TIMEOUT_MS) });
 	if (!res.ok) throw new Error(`CDP /json returned ${String(res.status)}`);
 	return (await res.json()) as Target[];
 }
@@ -57,24 +64,64 @@ class Session {
 				for (const l of this.listeners) l(msg.method, msg.params ?? {});
 			}
 		};
+		ws.onclose = () => {
+			this.failAll(new Error('CDP connection closed'));
+		};
+	}
+
+	private failAll(e: Error) {
+		const pending = [...this.pending.values()];
+		this.pending.clear();
+		for (const p of pending) p.reject(e);
 	}
 
 	static open(url: string): Promise<Session> {
 		return new Promise((resolve, reject) => {
 			const ws = new WebSocket(url);
+			const timer = setTimeout(() => {
+				ws.close();
+				reject(new Error(`timed out opening ${url} after ${String(TIMEOUT_MS)} ms`));
+			}, TIMEOUT_MS);
 			ws.onopen = () => {
+				clearTimeout(timer);
 				resolve(new Session(ws));
 			};
 			ws.onerror = () => {
+				clearTimeout(timer);
 				reject(new Error(`could not open ${url}`));
 			};
 		});
 	}
 
-	send<T = Record<string, unknown>>(method: string, params: Record<string, unknown> = {}): Promise<T> {
+	send<T = Record<string, unknown>>(
+		method: string,
+		params: Record<string, unknown> = {},
+		timeoutMs: number = TIMEOUT_MS,
+	): Promise<T> {
 		const id = this.nextId++;
-		this.ws.send(JSON.stringify({ id, method, params }));
-		return new Promise((resolve, reject) => this.pending.set(id, { resolve: resolve as (v: unknown) => void, reject }));
+		return new Promise<T>((resolve, reject) => {
+			const timer = setTimeout(() => {
+				this.pending.delete(id);
+				reject(new Error(`${method} timed out after ${String(timeoutMs)} ms`));
+			}, timeoutMs);
+			this.pending.set(id, {
+				resolve: (v) => {
+					clearTimeout(timer);
+					resolve(v as T);
+				},
+				reject: (e) => {
+					clearTimeout(timer);
+					reject(e);
+				},
+			});
+			try {
+				this.ws.send(JSON.stringify({ id, method, params }));
+			} catch (e) {
+				this.pending.delete(id);
+				clearTimeout(timer);
+				reject(e instanceof Error ? e : new Error(String(e)));
+			}
+		});
 	}
 
 	on(l: (method: string, params: Record<string, unknown>) => void) {
@@ -116,6 +163,7 @@ async function cmdEval(title: string, exprArg: string) {
 		const r = await s.send<{ result: { value?: unknown; description?: string }; exceptionDetails?: unknown }>(
 			'Runtime.evaluate',
 			{ expression, awaitPromise: true, returnByValue: true, allowUnsafeEvalBlockedByCSP: true },
+			EVAL_TIMEOUT_MS,
 		);
 		if (r.exceptionDetails) {
 			console.error(JSON.stringify(r.exceptionDetails, null, 2));
@@ -171,13 +219,20 @@ async function cmdFind(title: string, anchor: string, context: number, useRegex:
 
 const [cmd, ...argv] = process.argv.slice(2);
 const { opts, rest } = parseArgs(argv);
-if (cmd === 'targets') {
-	for (const t of await listTargets()) console.log(`${t.type.padEnd(8)} ${t.title}  ${t.url}`);
-} else if (cmd === 'eval' && rest[0]) {
-	await cmdEval(opts.target, rest[0]);
-} else if (cmd === 'find' && rest[0]) {
-	await cmdFind(opts.target, rest[0], opts.context, opts.regex, opts.max);
-} else {
-	console.error('usage: bun scripts/cdp.ts targets | eval [--target t] <expr|@file> | find [--target t] [--context N] [--regex] [--max N] <anchor>');
-	process.exitCode = 2;
+try {
+	if (cmd === 'targets') {
+		for (const t of await listTargets()) console.log(`${t.type.padEnd(8)} ${t.title}  ${t.url}`);
+	} else if (cmd === 'eval' && rest[0]) {
+		await cmdEval(opts.target, rest[0]);
+	} else if (cmd === 'find' && rest[0]) {
+		await cmdFind(opts.target, rest[0], opts.context, opts.regex, opts.max);
+	} else {
+		console.error('usage: bun scripts/cdp.ts targets | eval [--target t] <expr|@file> | find [--target t] [--context N] [--regex] [--max N] <anchor>');
+		process.exitCode = 2;
+	}
+} catch (e) {
+	console.error(`cdp.ts: ${e instanceof Error ? e.message : String(e)}`);
+	process.exit(1);
 }
+// A timed-out WebSocket can keep the event loop alive; leave explicitly.
+process.exit(process.exitCode ?? 0);
