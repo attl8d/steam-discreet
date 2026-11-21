@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { observable } from 'mobx';
+import { computed, makeObservable, observable } from 'mobx';
 import { readCurrentAccount } from '../../frontend/integrations/steam/account';
 import { clearCollectionCounts } from '../../frontend/integrations/steam/collectionCounts';
 import { seenHooks } from '../../frontend/integrations/steam/hookMarkers';
@@ -54,9 +54,52 @@ describe('clearCollectionCounts', () => {
 						throw new Error('x');
 					},
 					userCollections: [{ ClearCounts: () => undefined }, { ClearAppCounts: () => { throw new Error('y'); } }],
+					collectionsFromStorage: new Map(),
 				},
 			}),
 		).toBe(1);
+	});
+});
+
+describe('clearCollectionCounts before Steam has loaded its collections', () => {
+	// Steam's collectionStore, sp.js build 1794536281: `m_mapCollectionsFromStorage` is a plain
+	// field, undefined until the first cloud-storage change; `userCollections` is a keepAlive
+	// computed over it. Reading it early makes mobx cache the error for good.
+	class Store {
+		m_mapCollectionsFromStorage: Map<string, { ClearAppCounts(): void }> | undefined = undefined;
+		reads = 0;
+		constructor() {
+			makeObservable(this, { userCollections: computed({ keepAlive: true }) });
+		}
+		get collectionsFromStorage() {
+			return this.m_mapCollectionsFromStorage;
+		}
+		get userCollections() {
+			this.reads += 1;
+			return Array.from((this.collectionsFromStorage as Map<string, { ClearAppCounts(): void }>).values());
+		}
+		GetCollection() {
+			this.reads += 1;
+			return undefined;
+		}
+	}
+
+	test('touches nothing, so Steam\'s collections still compute once loaded', () => {
+		const store = new Store();
+		expect(clearCollectionCounts({ collectionStore: store })).toBe(0);
+		expect(store.reads).toBe(0);
+		let cleared = 0;
+		store.m_mapCollectionsFromStorage = new Map([['uc-1', { ClearAppCounts: () => (cleared += 1) }]]);
+		expect(store.userCollections.length).toBe(1);
+		expect(clearCollectionCounts({ collectionStore: store })).toBe(1);
+		expect(cleared).toBe(1);
+	});
+
+	test('the hazard it avoids: an early read poisons the computed', () => {
+		const store = new Store();
+		expect(() => store.userCollections).toThrow();
+		store.m_mapCollectionsFromStorage = new Map();
+		expect(() => store.userCollections).toThrow();
 	});
 });
 

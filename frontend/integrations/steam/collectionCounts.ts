@@ -63,9 +63,20 @@ function call(obj: unknown, key: string, ...args: unknown[]): unknown {
 	}
 }
 
+function isMapLike(value: unknown): boolean {
+	return value instanceof Map || (typeof value === 'object' && value !== null && typeof get(value, 'values') === 'function');
+}
+
 function iterate(value: unknown): unknown[] {
 	if (Array.isArray(value)) return value as unknown[];
 	if (value instanceof Map) return Array.from((value as Map<unknown, unknown>).values());
+	if (isMapLike(value)) {
+		try {
+			return Array.from((value as { values(): Iterable<unknown> }).values());
+		} catch {
+			return [];
+		}
+	}
 	return [];
 }
 
@@ -79,13 +90,22 @@ function iterate(value: unknown): unknown[] {
 export function clearCollectionCounts(root: unknown = globalThis): number {
 	const store = get(root, 'collectionStore');
 	if (store === undefined) return 0;
+	// Before Steam has read the collections from cloud storage, its map is
+	// undefined, and reading `userCollections` (a keepAlive computed) or other
+	// collection getters throws. mobx then caches that error with no
+	// dependency to recompute on, so Steam's own later reads keep throwing
+	// until the UI reloads (seen live on the Mac, 21 November 2026). Steam
+	// guards its own reads the same way (`OnAppOverviewChange`). Nothing can
+	// have cached counts yet, so there is nothing to clear.
+	const fromStorage = get(store, 'collectionsFromStorage');
+	if (!isMapLike(fromStorage)) return 0;
 	const seen = new Set<unknown>();
 	const add = (c: unknown): void => {
 		if (typeof c === 'object' && c !== null) seen.add(c);
 	};
 	for (const id of SYSTEM_COLLECTION_IDS) add(call(store, 'GetCollection', id));
 	for (const c of iterate(get(store, 'userCollections'))) add(c);
-	for (const c of iterate(get(store, 'collectionsFromStorage'))) add(c);
+	for (const c of iterate(fromStorage)) add(c);
 	let cleared = 0;
 	for (const c of seen) {
 		if (typeof get(c, 'ClearAppCounts') !== 'function') continue;
