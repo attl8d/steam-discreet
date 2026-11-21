@@ -1,0 +1,234 @@
+{
+  "ok": true,
+  "errors": [],
+  "build": {
+    "url": "https://steamloopback.host/index.html?LOCAL_HOSTNAME=<redacted>&LANGUAGE=english&COUNTRY=RO&LAUNCHER_TYPE=0&CLIENT_SESSION=<redacted>&PACKAGE_CL=1794536281&IN_CLIENT=true&PLATFORM=macos&ARCH=arm64&DEV_MODE=true&SHOW_CONSOLE=true",
+    "spJs": null,
+    "packageCl": "1794536281",
+    "millenniumVersion": null
+  },
+  "selection": {
+    "uiStoreKeysMatchingSelect": [
+      "m_gameListSelection",
+      "m_eSelectedGameListView"
+    ],
+    "protoMatchingSelect": [
+      "currentGameListSelection",
+      "SetGameListSelection",
+      "selectedGameListView",
+      "SelectCollectionsAppFilterOption",
+      "SelectGamepadCollectionsAppFilterOption",
+      "SelectVRCollectionsAppFilterOption",
+      "SetMultiSelectHooksForGameListSelection",
+      "SelectGameListView",
+      "UpdateGameListSelection"
+    ],
+    "m_gameListSelection": {
+      "strCollectionId": "string:\"recent-Recent\"",
+      "nAppId": "number:1062090"
+    },
+    "currentGameListSelection": {
+      "strCollectionId": "string:\"recent-Recent\"",
+      "nAppId": "number:1062090"
+    }
+  },
+  "popups": [
+    "SP Desktop_uid0",
+    "contextmenu_1_uid0",
+    "contextmenu_2_uid0",
+    "contextmenu_3_uid0",
+    "contextmenu_4_uid0",
+    "contextmenu_5_uid0",
+    "contextmenu_6_uid0"
+  ],
+  "menu": {
+    "appid": 3099640,
+    "error": "sidebar row for the first visible game not found; open the Library first"
+  },
+  "toggle": [
+    {
+      "rect": [
+        15,
+        135,
+        299,
+        19
+      ],
+      "dom": [
+        {
+          "tag": "SPAN",
+          "cls": "_3kSh7qVSTDcPDePx9kya8C ViewName",
+          "role": null,
+          "children": 0
+        },
+        {
+          "tag": "DIV",
+          "cls": "_2PF_m-I5yte3WnQhpcz8RC MenuHeader",
+          "role": null,
+          "children": 2
+        },
+        {
+          "tag": "DIV",
+          "cls": "_2WgQEFvIzJw_SHNGbjtRFU SearchBar",
+          "role": null,
+          "children": 2
+        },
+        {
+          "tag": "DIV",
+          "cls": "_1ZS_xta5HMXzR8JgxDH6n7 Bar",
+          "role": null,
+          "children": 2
+        },
+        {
+          "tag": "DIV",
+          "cls": "_3x1HklzyDs4TEjACrRO2tB Container",
+          "role": null,
+          "children": 4
+        },
+        {
+          "tag": "DIV",
+          "cls": "_9sPoVBFyE_vE87mnZJ5aB LeftListSizableContainer",
+          "role": null,
+          "children": 2
+        },
+        {
+          "tag": "DIV",
+          "cls": "_3xRRJfD2xy95i9NhJxLTp0 Container LibraryDisplaySizeMedium",
+          "role": null,
+          "children": 3
+        },
+        {
+          "tag": "DIV",
+          "cls": "RGNMWtyj73_-WdhflrmuY LocalContentContainer _3WJCt_OkjPA6npxOtguSt5 Library High",
+          "role": null,
+          "children": 2
+        }
+      ],
+      "ancestry": [
+        {
+          "depth": 4,
+          "name": "",
+          "propKeys": [
+            "gamelistref",
+            "bScrolledTop"
+          ],
+          "appProps": {},
+          "source": "function(qe,st){return le(function(){return xe(qe,st)},He)}"
+        },
+        {
+          "depth": 5,
+          "name": "d",
+          "propKeys": [
+            "children"
+          ],
+          "appProps": {},
+          "source": "class d extends a.Component{state={};constructor(A){super(A),this.state.lastErrorKey=A.errorKey}componentDidCatch(A,b){(0,i.aj)().ReportError(A,{strComponentSta"
+        },
+        {
+          "depth": 7,
+          "name": "jl",
+          "propKeys": [
+            "bSmallMode"
+          ],
+          "appProps": {},
+          "source": "Sr=>{const Ar=Lo(),jr=(0,d.useRef)(void 0),Zr=(0,d.useRef)(void 0),[ui,Ui]=(0,d.useState)(!0),tn=(0,d.useCallback)(()=>Zr.current?.FocusOnSearch(),[Zr]),jn=(0,d"
+        },
+        {
+          "depth": 9,
+          "name": "d",
+          "propKeys": [
+            "children"
+          ],
+          "appProps": {},
+          "source": "class d extends a.Component{state={};constructor(A){super(A),this.state.lastErrorKey=A.errorKey}componentDidCatch(A,b){(0,i.aj)().ReportError(A,{strComponentSta"
+        },
+        {
+          "depth": 10,
+          "name": "d",
+          "propKeys": [
+            "children"
+          ],
+          "appProps": {},
+          "source": "class d extends a.Component{state={};constructor(A){super(A),this.state.lastErrorKey=A.errorKey}componentDidCatch(A,b){(0,i.aj)().ReportError(A,{strComponentSta"
+        },
+        {
+          "depth": 11,
+          "name": "Router",
+          "propKeys": [
+            "value",
+            "children"
+          ],
+          "appProps": {},
+          "source": null
+        },
+        {
+          "depth": 12,
+          "name": "Symbol(react.consumer)",
+          "propKeys": [
+            "children"
+          ],
+          "appProps": {},
+          "source": null
+        },
+        {
+          "depth": 13,
+          "name": "L1",
+          "propKeys": [
+            "path",
+            "children",
+            "location",
+            "computedMatch"
+          ],
+          "appProps": {},
+          "source": "function L1(){return z1.apply(this,arguments)||this}"
+        },
+        {
+          "depth": 14,
+          "name": "Symbol(react.consumer)",
+          "propKeys": [
+            "children"
+          ],
+          "appProps": {},
+          "source": null
+        },
+        {
+          "depth": 15,
+          "name": "L1",
+          "propKeys": [
+            "children"
+          ],
+          "appProps": {},
+          "source": "function L1(){return z1.apply(this,arguments)||this}"
+        },
+        {
+          "depth": 17,
+          "name": "Symbol(react.context)",
+          "propKeys": [
+            "value",
+            "children"
+          ],
+          "appProps": {},
+          "source": null
+        },
+        {
+          "depth": 18,
+          "name": "S",
+          "propKeys": [
+            "defaultOptions",
+            "children"
+          ],
+          "appProps": {},
+          "source": "function S(F){let{defaultOptions:j,children:A}=F,b=a.useMemo(()=>({defaultOptions:j||{}}),[j]);return(0,e.jsx)(B.Provider,{value:b,children:A})}"
+        },
+        {
+          "depth": 19,
+          "name": "n",
+          "propKeys": [
+            "children"
+          ],
+          "appProps": {},
+          "source": "function n(c){let{children:l}=c,u=s(),B=o.useMemo(()=>({content_descriptors_excluded:u}),[u]);return(0,e.jsx)(i.E2,{defaultOptions:B,children:l})}"
+        }
+      ]
+    }
+  ]
+}

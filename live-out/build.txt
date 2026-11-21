@@ -1,0 +1,6 @@
+Steam client build (PACKAGE_CL): 1794536281
+Platform: macos arm64 (macOS 27.2.1)
+sp.js contenthash: ecfb6699297d77d920fd
+Millennium: v3.6.3 + PR 841 + tools/millennium-macos patches (local build v3.6.3-25-g23367f6e)
+Probe run: 2026-11-21 20:28 EET, Library open (steam://open/games)
+Notes: LOCAL_HOSTNAME and CLIENT_SESSION redacted from build.url. sp.js saved locally only (not committed).
