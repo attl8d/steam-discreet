@@ -1,0 +1,120 @@
+{
+  "ok": false,
+  "errors": [
+    "menu did not switch to Unmark",
+    "Unmark did not untag the game"
+  ],
+  "steps": [
+    {
+      "step": "clicked Mark",
+      "tagged": true,
+      "menuClosed": true
+    },
+    {
+      "step": "toggle on",
+      "revealed": true,
+      "toggle": {
+        "label": "Hide adult games",
+        "pressed": "true",
+        "disabled": "false",
+        "className": "_3mzKdQXht__YHo6PX1LmB6 CheckboxWithImage _1QFFkxM5hw-43miIiylbwq Active",
+        "parentClass": "_1PgAonvorr0o_NMxNKiDFU Filters",
+        "siblings": 4,
+        "rect": [
+          316,
+          134,
+          20,
+          20
+        ]
+      },
+      "visible": true
+    },
+    {
+      "step": "reopened menu while tagged and revealed",
+      "menu": null
+    },
+    {
+      "step": "clicked Unmark",
+      "tagged": true
+    },
+    {
+      "step": "toggle off",
+      "revealed": false,
+      "toggle": {
+        "label": "Show adult games",
+        "pressed": "false",
+        "disabled": "false",
+        "className": "_3mzKdQXht__YHo6PX1LmB6 CheckboxWithImage",
+        "parentClass": "_1PgAonvorr0o_NMxNKiDFU Filters",
+        "siblings": 4,
+        "rect": [
+          316,
+          134,
+          20,
+          20
+        ]
+      }
+    }
+  ],
+  "build": "1794536281",
+  "pluginExports": [
+    "default",
+    "sdLibrary",
+    "sdRevealToggle",
+    "sdShouldHide",
+    "sdTagMenuItem",
+    "__millennium_internal_plugin_name_do_not_use_or_change__"
+  ],
+  "state": {
+    "ready": true,
+    "revealed": false,
+    "seamStatus": "ok",
+    "warning": null
+  },
+  "markersBefore": {
+    "library-visibility": 1,
+    "reveal-toggle": 1,
+    "game-context-menu": 1
+  },
+  "toggle": {
+    "label": "Show adult games",
+    "pressed": "false",
+    "disabled": "false",
+    "className": "_3mzKdQXht__YHo6PX1LmB6 CheckboxWithImage",
+    "parentClass": "_1PgAonvorr0o_NMxNKiDFU Filters",
+    "siblings": 4,
+    "rect": [
+      316,
+      134,
+      20,
+      20
+    ]
+  },
+  "appid": 1062090,
+  "menu": {
+    "label": "Mark as adult",
+    "className": "_1n7Wloe5jZ6fSuvV18NNWI contextMenuItem contextMenuItem",
+    "disabled": false,
+    "inWindow": "main",
+    "siblingItems": [
+      "Play",
+      "Mark as adult",
+      "Remove from Favorites",
+      "Add to",
+      "Remove from",
+      "Manage",
+      "",
+      "Properties..."
+    ]
+  },
+  "markersAfterMenu": {
+    "library-visibility": 1,
+    "reveal-toggle": 1,
+    "game-context-menu": 1
+  },
+  "final": {
+    "tagged": false,
+    "revealed": false,
+    "visible": true
+  }
+}
