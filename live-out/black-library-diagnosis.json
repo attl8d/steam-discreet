@@ -1,0 +1,45 @@
+{
+  "when": "2026-11-21 21:58-22:00 EET",
+  "build_in_plugins_folder": "main ef7566e (steam-discreet.star 121729 B, built 21:57)",
+  "steam_started_by": "scripts/restart-steam-mac.sh -> /Applications/Steam Millennium.app steam_osx -dev -devtools-port 8080 (Millennium v3.6.3 + tools/millennium-macos)",
+  "check_scripts_after_start": "none; only getState() reads. The 21:57 start errored with no live-check script run.",
+  "steam_errors_by_start": [
+    {
+      "time": "21:50:14",
+      "plugin_build": "35d9e09 (PR 11 first version)",
+      "error": "LibraryUIStore - ERROR TypeError: Cannot read properties of undefined (reading 'forEach')"
+    },
+    {
+      "time": "21:52:01",
+      "plugin_build": "main ef7566e",
+      "error": "same"
+    },
+    {
+      "time": "21:56",
+      "plugin_build": "21ca2f9 (PR 11 with startup fix)",
+      "error": "none"
+    },
+    {
+      "time": "21:57:18",
+      "plugin_build": "main ef7566e",
+      "error": "same, plus Uncaught (in promise) TypeError: ...reading 'forEach' at 21:57:21"
+    }
+  ],
+  "stacks": "webhelper_js.txt logs only the message; Millennium's ErrorBoundaryHook logs [object Object]. No stack available after the fact.",
+  "live_state": {
+    "collectionsFromStorage": "ObservableMap-like (toString [object Map], instanceof Map false), size 19 now",
+    "userCollections_length": "TypeError: Cannot read properties of undefined (reading 'values')  -- still throws now, although collectionsFromStorage is populated",
+    "hooks": {
+      "library-visibility": 1
+    },
+    "getState": {
+      "ready": true,
+      "revealed": false,
+      "seamStatus": "ok",
+      "warning": null
+    },
+    "getMode": "not on main"
+  },
+  "steam_source": "get userCollections(){...Array.from(this.collectionsFromStorage.values())...}  (sp.js @11974764)",
+  "diagnosis": "userCollections is a mobx computed. If it is first evaluated before CollectionStore has set m_mapCollectionsFromStorage, it throws and mobx caches that exception; the cached error never clears, so LibraryUIStore init (forEach over it) fails and the Library renders black. On main the plugin's refreshSteam -> clearCounts -> clearCollectionCounts reads collectionStore.userCollections as soon as the tag list loads. With 0 tags nothing triggered it early; with Attila's 98 tags it fires during startup. 21ca2f9's startup fix (f43f5c3) avoids it, matching the error-free 21:56 start."
+}
