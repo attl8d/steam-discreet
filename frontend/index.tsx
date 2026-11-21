@@ -1,6 +1,9 @@
+import type { ReactNode } from 'react';
 import { definePlugin, Field } from 'millennium';
 import { Icon } from './components/Icon';
 import { steamLibraryPort } from './integrations/steam';
+import { tagMenuItem } from './integrations/steam/contextMenu';
+import { revealToggleSlot } from './integrations/steam/revealToggleSlot';
 import { installLibrary, LibraryService } from './services/library';
 import { millenniumTagRpc, TagStorage } from './services/tagStorage';
 
@@ -33,6 +36,18 @@ export const sdLibrary = {
 	tagGames: (appIds: readonly number[]) => library.tagGames(appIds),
 	untagGames: (appIds: readonly number[]) => library.untagGames(appIds),
 };
+
+/**
+ * @ffi Called by Steam's patched game context menu (hook `game-context-menu`)
+ * with the games the menu acts on. Returns the Mark/Unmark as adult item.
+ */
+export const sdTagMenuItem = (rgApps: unknown): ReactNode => tagMenuItem(rgApps);
+
+/**
+ * @ffi Called by Steam's patched Library sidebar header (hook `reveal-toggle`)
+ * with Steam's filter-icon class names. Returns the reveal toggle.
+ */
+export const sdRevealToggle = (classes: unknown): ReactNode => revealToggleSlot(classes);
 
 const SettingsContent = () => <Field label="Steam Discreet" description="Settings arrive in M5." />;
 

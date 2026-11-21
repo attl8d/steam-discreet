@@ -45,6 +45,38 @@ return {
             },
         },
         {
+            id = "game-context-menu",
+            runs = "on_demand",
+            description = "The game context menu's render() in sp.js (webpack module 43394, the class with GetTargetApps). "
+                .. "Steam uses this one menu for the sidebar (with multi-select), grid tiles, the game page gear button, "
+                .. "Downloads and update events. The patch adds Steam Discreet's Mark/Unmark as adult item after "
+                .. "the primary action. Seen on Steam build 1794536281.",
+            file = [=[(^|[\\/])sp\.js([?]|$)]=],
+            find = [=[render\(\)\{const ([A-Za-z_$][A-Za-z0-9_$]*)=this\.GetTargetApps\(\),[^;]*;return\(0,[A-Za-z_$][A-Za-z0-9_$]*\.jsxs\)\([A-Za-z_$][A-Za-z0-9_$.]*,\{label:[^,]*,children:\[!this\.props\.omitPrimaryAction&&this\.GetPrimaryActionMenuItem\([A-Za-z_$][A-Za-z0-9_$]*,[A-Za-z_$][A-Za-z0-9_$]*\),this\.props\.additionalActions,]=],
+            transforms = {
+                {
+                    match = [=[render\(\)\{const ([A-Za-z_$][A-Za-z0-9_$]*)=this\.GetTargetApps\(\),([^;]*;return\(0,[A-Za-z_$][A-Za-z0-9_$]*\.jsxs\)\([A-Za-z_$][A-Za-z0-9_$.]*,\{label:[^,]*,children:\[!this\.props\.omitPrimaryAction&&this\.GetPrimaryActionMenuItem\([A-Za-z_$][A-Za-z0-9_$]*,[A-Za-z_$][A-Za-z0-9_$]*\),this\.props\.additionalActions,)]=],
+                    replace = [=[render(){const \1=this.GetTargetApps(),\2(#{{marker}},#{{self}}?.sdTagMenuItem?.(\1)??null),]=],
+                },
+            },
+        },
+        {
+            id = "reveal-toggle",
+            runs = "on_demand",
+            description = "The Library sidebar header in sp.js: the row of icon filters under the Games dropdown "
+                .. "(ViewFiltersBar > Filters, next to sort-by-recent and ready-to-play). The patch adds Steam Discreet's "
+                .. "show/hide adult games toggle as the first icon, styled with Steam's own CheckboxWithImage classes. "
+                .. "Seen on Steam build 1794536281.",
+            file = [=[(^|[\\/])sp\.js([?]|$)]=],
+            find = [=[\(0,[A-Za-z_$][A-Za-z0-9_$]*\.jsx\)\("div",\{className:[A-Za-z_$][A-Za-z0-9_$]*\(\)\.ViewFiltersBar,children:\(0,[A-Za-z_$][A-Za-z0-9_$]*\.jsxs\)\("div",\{className:\(0,[A-Za-z_$][A-Za-z0-9_$]*\.A\)\([A-Za-z_$][A-Za-z0-9_$]*\(\)\.Filters,[A-Za-z_$][A-Za-z0-9_$]*&&[A-Za-z_$][A-Za-z0-9_$]*\(\)\.Disabled\),children:\[]=],
+            transforms = {
+                {
+                    match = [=[(\(0,[A-Za-z_$][A-Za-z0-9_$]*\.jsx\)\("div",\{className:)([A-Za-z_$][A-Za-z0-9_$]*)(\(\)\.ViewFiltersBar,children:\(0,[A-Za-z_$][A-Za-z0-9_$]*\.jsxs\)\("div",\{className:\(0,[A-Za-z_$][A-Za-z0-9_$]*\.A\)\([A-Za-z_$][A-Za-z0-9_$]*\(\)\.Filters,[A-Za-z_$][A-Za-z0-9_$]*&&[A-Za-z_$][A-Za-z0-9_$]*\(\)\.Disabled\),children:\[)]=],
+                    replace = [=[\0(#{{marker}},#{{self}}?.sdRevealToggle?.({button:\2().CheckboxWithImage,active:\2().Active,disabled:\2().Disabled})??null),]=],
+                },
+            },
+        },
+        {
             id = "placeholder-example",
             placeholder = true,
             runs = "startup",

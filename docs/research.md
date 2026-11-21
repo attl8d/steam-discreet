@@ -422,3 +422,28 @@ bun scripts/cdp.ts eval @scripts/live/m3-cycle.js
 ```
 
 The script tags the game through the plugin (`PLUGIN_LIST['steam-discreet'].sdLibrary`), and after each of: tagged, revealed, hidden again, untagged, it checks `BIsVisible`, membership and visible counts of All, Installed, Favorites and the game's user collections, that native Hidden and Favorites are unchanged, and that the filter state is unchanged. It untags the game at the end even if a step fails. Also to check by eye, with the game tagged and then revealed: the sidebar row and the counts in the sidebar collection headers, the collection tiles and their counts in the Collections view (a count-only surface, see above), exact-name Library search, and Home shelves.
+
+## M4 tag menu and reveal toggle (read from source, live check pending)
+
+Read on 21 November 2026 from Valve's public `steamui_websrc_all.zip` for build **1794536281** (same zip and hash as in "M3 library hiding"). A first read-only probe ran on the Mac client, same build and the same sp.js contenthash `ecfb6699297d77d920fd` (branch `live-out/m4-probe`).
+
+### Game context menu (hook `game-context-menu`)
+
+- One class component builds the game context menu: webpack module `43394`, exported as `uU`, the class with `GetTargetApps()`. It is a mobx observer. Its `render()` starts `const Gt=this.GetTargetApps(),...;return(0,e.jsxs)(U.tz,{label:...,children:[!this.props.omitPrimaryAction&&this.GetPrimaryActionMenuItem(Gt,ot),this.props.additionalActions,...`.
+- `GetTargetApps()` returns app overviews. With `includeMultiSelect` and the right-clicked game inside the current multi-selection, it is every selected app (`GetSelectedAppIds()` mapped through `GetAppOverviewByAppID`); otherwise `[this.props.overview]`. So the menu's own target list is the selection, and the item never has to read `uiStore`.
+- Callers seen in sp.js: the sidebar game row (`includeMultiSelect:!0`, `strCollectionId`), grid and shelf tiles (`hasCustomArtwork`, `onChangeArtwork`), the game page gear button (`omitPrimaryAction:!0`), Downloads (`additionalActions`), major-update event cards, and a dev gallery entry. One hook covers them all.
+- Steam's own "Mark as Private" item (`Ie`, `MarkAsPrivate`/`UnmarkAsPrivate`) disables itself when any target `BIsModOrShortcut()`. Steam Discreet does the same: a shortcut or mod in the selection disables the item (shortcuts are out of scope for v1).
+- The hook inserts `(marker, PLUGIN_LIST['steam-discreet']?.sdTagMenuItem?.(Gt) ?? null)` right after `additionalActions`. `sdTagMenuItem` validates `Gt` in `frontend/integrations/steam/contextMenu.tsx` and never throws.
+- Menu items are Steam's `U.kt` (props `onSelected`, `disabled`). The Millennium SDK's `MenuItem` is expected to be the same component; not yet confirmed live.
+- On the Mac, `g_PopupManager` already held six `contextmenu_*_uid0` popups, so the menu probably renders in a popup window there; on Windows M1 saw it inline in the main window. The check script searches every popup's document.
+
+### Reveal toggle (hook `reveal-toggle`)
+
+- The sidebar header is the observer component `Pl` (props `gamelistref`, `bScrolledTop`). It renders `Bar > SearchBar > MenuHeader` (the "Games" dropdown: `ViewName` span plus `Arrow`) and then `ViewFiltersBar > Filters`, a row of icon toggles (platform, sort by recent, ready to play) styled `CheckboxWithImage` with `Active` and `Disabled`.
+- The Mac probe found the `ViewName` span ("GAMES") inside `MenuHeader > SearchBar > Bar` at rect [15,135,299,19], with `Pl` four fibers up. This matches the source.
+- The hook inserts the toggle as the first child of `Filters` and passes Steam's own class values for `CheckboxWithImage`, `Active` and `Disabled`, read from the CSS module at render time (keys only, never hashed values), so it looks like the neighbouring icons.
+- `runs = "on_demand"`: the header renders only when the Library is shown, which is not guaranteed at every start.
+
+### Live check
+
+`scripts/live/m4-menu-check.js` reads the markers, finds the toggle and opens the menu on a game row; with `SD_CHECK_CLICK = true` it also clicks Mark, the toggle, Unmark and the toggle again. Results pending.
