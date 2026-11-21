@@ -1,26 +1,40 @@
-import { callable, definePlugin, Field } from 'millennium';
+import { definePlugin, Field } from 'millennium';
 import { Icon } from './components/Icon';
+import { steamLibraryPort } from './integrations/steam';
+import { installLibrary, LibraryService } from './services/library';
+import { millenniumTagRpc, TagStorage } from './services/tagStorage';
 
-// M1 experiment 1: a hardcoded test set (Factorio). Replaced by the tag store in M3.
-const EXPERIMENT_TAGS = new Set<number>([427520]);
+const library = new LibraryService(new TagStorage(millenniumTagRpc()), steamLibraryPort());
+installLibrary(library);
+// Start now, not in definePlugin, so the signal exists before Steam first
+// computes its Library lists (see services/library.ts).
+library.start();
 
-/** @ffi Read by the patched collectionStore.BIsVisible. */
-export const sdIsTagged = (appId: unknown): boolean => typeof appId === 'number' && EXPERIMENT_TAGS.has(appId);
+/**
+ * @ffi Called by Steam's patched collectionStore.BIsVisible (hook
+ * `library-visibility`) for every game. True hides the game.
+ */
+export const sdShouldHide = (appId: unknown): boolean => library.shouldHide(appId);
 
-const probe = callable('sd_diag_probe');
-
-/** @ffi M1 diagnostics, called over CDP. */
-export const sdDiagnostics = {
-	probe: () => probe(),
+/**
+ * @ffi The library API, for the CDP live check (scripts/live/m3-cycle.js) and
+ * diagnostics. The same functions the menu and toggle use.
+ */
+export const sdLibrary = {
+	getState: () => library.getState(),
+	isTagged: (appId: number) => library.isTagged(appId),
+	isRevealed: () => library.isRevealed(),
+	setRevealed: (on: boolean) => {
+		library.setRevealed(on);
+	},
+	tagGames: (appIds: readonly number[]) => library.tagGames(appIds),
+	untagGames: (appIds: readonly number[]) => library.untagGames(appIds),
 };
 
-const SettingsContent = () => <Field label="Steam Discreet" description="M1 diagnostic build. Settings arrive in M5." />;
+const SettingsContent = () => <Field label="Steam Discreet" description="Settings arrive in M5." />;
 
-export default definePlugin(() => {
-	console.log('[steam-discreet] frontend loaded');
-	return {
-		title: 'Steam Discreet',
-		icon: <Icon />,
-		content: <SettingsContent />,
-	};
-});
+export default definePlugin(() => ({
+	title: 'Steam Discreet',
+	icon: <Icon />,
+	content: <SettingsContent />,
+}));

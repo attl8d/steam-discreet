@@ -1,4 +1,4 @@
-﻿// CDP helper for inspecting the live Steam client (M1, repair loop).
+// CDP helper for inspecting the live Steam client (M1, repair loop).
 //
 // Needs `<Steam>\.cef-enable-remote-debugging` and a Steam restart, which
 // exposes the Chrome DevTools Protocol on localhost:8080.

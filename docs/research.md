@@ -260,9 +260,61 @@ So the M2 atomic save must replace the target with Millennium's `fs.rename`, not
 
 ### Next steps
 
-1. Solve reactivity (above), then re-run Experiment 1 with a live toggle.
+1. Solve reactivity (above), then re-run Experiment 1 with a live toggle. (M3: fix designed from source, see "M3 library hiding"; live check pending.)
 2. Check Home shelves, Recent Games and a long sidebar scroll on screen. Screen control of Steam was declined in this session, so this needs either that permission or more CDP/DOM checks.
 3. Experiment 2: inject a test item into the game context menu.
 4. Experiment 3: locate the Games filter dropdown and attach a control.
 5. Experiment 4: trace What's New entries with several App IDs, pagination and caching.
 6. Open question 7: disable the plugin and see whether the UI reloads.
+
+## M3 library hiding (read from source, live check pending)
+
+Written 21 November 2026. The Windows PC was not reachable from the M3 session, so everything here comes from Steam's own UI code for build **1794536281**, the build M1 tested live, plus the M1 live results above. Nothing in this section has been seen in the running client yet. The live check is `scripts/live/m3-cycle.js` (below).
+
+### Where the code came from
+
+Valve's public client manifest `https://client-update.akamai.steamstatic.com/steam_client_win64` lists `"version" "1794536281"` and `steamui_websrc_all.zip.6b12af2378a42fe50e9fc3d8b636c5679e917581` (sha256 `c4ef0ef1…a7b69b`, matching the manifest). That zip holds `steamui/sp.js` (16,224,005 bytes) and `steamui/libraries/*`. Its `BIsVisible` body is byte-identical to the one M1 read from the live client, so it is the same code. This is a way to read a build's code without the PC; it does not replace a live check.
+
+### The hook: `library-visibility`
+
+- Same seam as M1 experiment 1 (`collectionStore.BIsVisible`), now in `backend/hook_definitions.lua` with portable regexes, a `#{{marker}}` and the plugin call `sdShouldHide`. Only `=== !0` (true) hides, so any other result, or a missing plugin, leaves the game visible.
+- The `find` matches exactly once in the real 1794536281 `sp.js`, and the patched file parses (checked with the fixture harness against the full file; the fixture keeps a trimmed copy).
+- `runs = "startup"`: every collection's `visibleApps` calls `BIsVisible` as soon as the Library computes, which M1 saw on every start.
+
+### Why the lists did not refresh in M1, and the fix
+
+From `sp.js` module 59671 (CollectionStore):
+
+- Each collection class decorates `allApps` and `visibleApps` with `computed({keepAlive:true})`; `visibleApps` is `this.allApps.filter(Z=>he.BIsVisible(Z))`. The system collections themselves (`allGamesCollection`, `localGamesCollection`, `userCollections`, ...) are keepAlive computeds on the store.
+- `BIsHidden` reads `collectionsFromStorage.get("hidden").apps`, an observable, which is why native Hidden refreshes lists: it is a mobx dependency of every `visibleApps`.
+- So the fix is to make our check a mobx dependency too. `sdShouldHide` reads a box created with **Steam's own mobx** on every call (also while revealed, so the dependency never drops). A tag or toggle change bumps the box, and mobx recomputes exactly the lists that called `BIsVisible`, in place, with Steam's filters and sort untouched.
+- Steam's mobx is webpack module `89193` in `libraries~00299a408.js` (mobx 6; export `sH` is `observable`, `EW` is `computed`). The plugin finds `observable` by shape (a function with `box` and `array`), as M1 did live, never by the minified name.
+- Steam calls `configure({enforceActions:"never"})` (module `K=t(89193)`, `(0,K.jK)({enforceActions:"never"})`), so setting the box outside an action is allowed.
+- Counts are cached separately: `GetAppCountWithToolsFilter(filter)` stores results in a plain `Map` (`m_mapFilterToAppCounts`), emptied only by `ClearAppCounts()`. Steam calls it itself when membership changes. The plugin calls `ClearAppCounts()` on every reachable collection before bumping the box. It clears a cache of numbers; it changes no collection, Hidden or Private state.
+- The collections reached: `GetCollection(id)` for the built-in ids that `GetCollection` resolves (listed in `frontend/integrations/steam/collectionCounts.ts`), `userCollections` and `collectionsFromStorage`.
+- Timing: Millennium appends plugin frontends once `App.BFinishedInitBeforeLogin()` is true (`src/typescript/sdk/src/index.ts` `startClient`, Millennium `ca8976d`), i.e. before login and before the Library has app data. The plugin creates the box when its module loads, so lists computed after that depend on it. A list computed before the plugin loaded would not refresh until Steam recomputes it; the live check shows whether that happens.
+- `tests/frontend/steamReactivity.test.ts` models this with real mobx 6: keepAlive `visibleApps`, the count Map and an autorun "sidebar". It shows the lists and counts update on tag, reveal, hide and untag, and that without the box they stay stale (the M1 result).
+
+### Account
+
+`App.m_CurrentUser.strSteamID` (confirmed live in M1) is read every second until it holds a valid SteamID64, then the tag file for that account is opened. Until then nothing is hidden (fail open).
+
+### Names used and their status
+
+| Name | Status |
+| --- | --- |
+| `collectionStore.BIsVisible`, `BIsHidden`, `BIsFavorite`, `GetCollection`, `userCollections` | Live, M1, build 1794536281 |
+| `App.m_CurrentUser.strSteamID` | Live, M1 |
+| mobx `observable` found by `.box`/`.array` shape in `webpackChunksteamui` | Live, M1 |
+| `collectionStore.collectionsFromStorage`, collection `ClearAppCounts()` | Source only, build 1794536281. Each is type-checked before use; a miss skips that cache. |
+| `uiStore.m_currentAppFilter.ToStorageFormat()` | Source only; used by the live check script only, to prove filter state is unchanged. |
+
+### Live check to run on the PC
+
+```text
+bun run build                       # then restart Steam (patches need a full restart)
+bun scripts/cdp.ts eval "globalThis.SD_CHECK_APPID = 427520"
+bun scripts/cdp.ts eval @scripts/live/m3-cycle.js
+```
+
+The script tags the game through the plugin (`PLUGIN_LIST['steam-discreet'].sdLibrary`), and after each of: tagged, revealed, hidden again, untagged, it checks `BIsVisible`, membership and visible counts of All, Installed, Favorites and the game's user collections, that native Hidden and Favorites are unchanged, and that the filter state is unchanged. It untags the game at the end even if a step fails. Also to check by eye: the sidebar row and the counts in the collection headers, exact-name Library search, and Home shelves.

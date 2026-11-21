@@ -30,6 +30,21 @@ return {
     version = 1,
     hooks = {
         {
+            id = "library-visibility",
+            runs = "startup",
+            description = "collectionStore.BIsVisible in sp.js: Steam's own 'show this game in the Library' check. "
+                .. "Every collection's visible list and count, Library search and Home What's New read it. "
+                .. "The patch adds 'and not hidden by Steam Discreet'. Seen on Steam build 1794536281.",
+            file = [=[(^|[\\/])sp\.js([?]|$)]=],
+            find = [=[BIsVisible\([A-Za-z_$][A-Za-z0-9_$]*\)\{const [A-Za-z_$][A-Za-z0-9_$]*=typeof [A-Za-z_$][A-Za-z0-9_$]*=="number"\?[A-Za-z_$][A-Za-z0-9_$.]*\.GetAppOverviewByAppID\([A-Za-z_$][A-Za-z0-9_$]*\):[A-Za-z_$][A-Za-z0-9_$]*;return [^}]*&&!this\.BIsHidden\([A-Za-z_$][A-Za-z0-9_$]*\.appid\)\}]=],
+            transforms = {
+                {
+                    match = [=[&&!this\.BIsHidden\(([A-Za-z_$][A-Za-z0-9_$]*)\.appid\)\}]=],
+                    replace = [=[&&!this.BIsHidden(\1.appid)&&!(#{{marker}},#{{self}}?.sdShouldHide?.(\1.appid)===!0)}]=],
+                },
+            },
+        },
+        {
             id = "placeholder-example",
             placeholder = true,
             runs = "startup",

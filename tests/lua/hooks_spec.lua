@@ -36,9 +36,18 @@ describe("backend/hooks.lua", function()
 
     it("never sends placeholder hooks to Millennium", function()
         local loaded = hooks.load()
-        for _, h in ipairs(loaded.hooks) do assert.is_true(h.placeholder) end
-        assert.are.same({}, hooks.patches(loaded))
-        assert.are.same({}, hooks.manifest(loaded).expected)
+        local real = {}
+        for _, h in ipairs(loaded.hooks) do
+            if not h.placeholder then real[#real + 1] = h.id end
+        end
+        local patches = hooks.patches(loaded)
+        assert.are.equal(#real, #patches)
+        for _, p in ipairs(patches) do
+            assert.is_falsy(p.find:find("ExampleIsFiltered", 1, true))
+        end
+        local expected = {}
+        for _, e in ipairs(hooks.manifest(loaded).expected) do expected[#expected + 1] = e.id end
+        assert.are.same(real, expected)
     end)
 
     it("builds Millennium's patch shape with the marker expanded", function()
