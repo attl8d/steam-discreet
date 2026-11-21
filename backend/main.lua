@@ -101,9 +101,17 @@ function M.on_frontend_loaded()
     start_update_check()
 end
 
--- What the frontend self-check expects. Wired to the settings page later.
+-- What the frontend self-check expects: the hooks sent to Millennium and the
+-- ones refused at load. The library service reads it for the toggle warning.
 function M.hook_manifest()
     return hooks.manifest(loaded_hooks)
+end
+
+---@ffi
+---The hook manifest for the frontend self-check, as a JSON string.
+---@return string|nil
+function steam_discreet_hook_manifest()
+    return as_json(M.hook_manifest())
 end
 
 -- Static patch table, read once by Millennium at load. It cannot depend on

@@ -69,7 +69,13 @@ function iterate(value: unknown): unknown[] {
 	return [];
 }
 
-/** Returns how many caches were cleared; 0 means none could be reached. */
+/**
+ * Returns how many caches were cleared; 0 means none could be reached.
+ *
+ * Runs only on a tag or toggle change. `GetCollection` evaluates some getters
+ * that are not cached (for example the uncategorized collection, a pass over
+ * all apps), which is acceptable at that rate.
+ */
 export function clearCollectionCounts(root: unknown = globalThis): number {
 	const store = get(root, 'collectionStore');
 	if (store === undefined) return 0;

@@ -16,6 +16,8 @@ class Backend implements TagStorageRpc {
 	readonly tags = new Set<number>();
 	readonly calls: string[] = [];
 	failWrites = false;
+	/** Number of upcoming open calls that throw (a transient RPC failure). */
+	failOpens = 0;
 	state = 'ok';
 	private reply(name: string, change: () => void): Promise<unknown> {
 		this.calls.push(name);
@@ -31,6 +33,11 @@ class Backend implements TagStorageRpc {
 		return Promise.resolve({ ok: true, ...base() });
 	}
 	open(account: string) {
+		if (this.failOpens > 0) {
+			this.failOpens -= 1;
+			this.calls.push('open-failed');
+			return Promise.reject(new Error('backend not ready'));
+		}
 		return this.reply('open', () => {
 			this.calls.push(`account:${account}`);
 		});
@@ -104,6 +111,14 @@ class FakePort implements LibraryPort {
 	seenHooks() {
 		return this.seen;
 	}
+	manifest: unknown = JSON.stringify({
+		version: 1,
+		expected: [{ id: VISIBILITY_HOOK_ID, description: 'd', runs: 'startup', file: 'f', find: 'x' }],
+		rejected: {},
+	});
+	hookManifest(): Promise<unknown> {
+		return Promise.resolve(this.manifest);
+	}
 }
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
@@ -158,6 +173,7 @@ describe('hiding', () => {
 			currentAccount: () => ACCOUNT,
 			seenHooks: () => new Set(),
 			clearCounts: () => 0,
+			hookManifest: () => Promise.resolve(null),
 			createSignal: () => ({
 				read: () => {
 					throw new Error('boom');
@@ -311,5 +327,96 @@ describe('seam status', () => {
 		const lib = new LibraryService(new TagStorage(backend), port, new FakeClock());
 		lib.start();
 		expect(lib.getState().seamStatus).toBe('warning');
+	});
+});
+
+describe('loading tags', () => {
+	test('a failed first open is retried with backoff, and warns until it loads', async () => {
+		const backend = new Backend();
+		backend.tags.add(570);
+		backend.failOpens = 2;
+		const clock = new FakeClock();
+		const lib = new LibraryService(new TagStorage(backend), new FakePort(), clock, { retryMs: 1000, maxRetryMs: 4000 });
+		lib.start();
+		await flush();
+		expect(backend.calls).toEqual(['open-failed']);
+		expect(lib.getState().ready).toBe(false);
+		expect(lib.getState().warning).toContain('could not be loaded');
+		expect(lib.shouldHide(570)).toBe(false);
+
+		clock.advance(500); // before the first retry is due
+		await flush();
+		expect(backend.calls).toEqual(['open-failed']);
+		clock.advance(500); // 1 s: retry, fails again; next in 2 s
+		await flush();
+		expect(backend.calls).toEqual(['open-failed', 'open-failed']);
+		clock.advance(1000);
+		await flush();
+		expect(backend.calls.filter((c) => c.startsWith('open')).length).toBe(2);
+		clock.advance(1000); // 2 s after the second failure
+		await flush();
+		expect(lib.getState().ready).toBe(true);
+		expect(lib.getState().warning).toBeNull();
+		expect(lib.shouldHide(570)).toBe(true);
+		clock.advance(10_000);
+		await flush();
+		expect(backend.calls.filter((c) => c === 'open').length).toBe(1);
+	});
+
+	test('an unusable reply also counts as a failure', async () => {
+		const backend = new Backend();
+		const original = backend.open.bind(backend);
+		let first = true;
+		backend.open = (account: string) => {
+			if (first) {
+				first = false;
+				return Promise.resolve({ nonsense: true });
+			}
+			return original(account);
+		};
+		const clock = new FakeClock();
+		const lib = new LibraryService(new TagStorage(backend), new FakePort(), clock, { retryMs: 1000 });
+		lib.start();
+		await flush();
+		expect(lib.getState().warning).toContain('could not be loaded');
+		clock.advance(1000);
+		await flush();
+		expect(lib.getState().ready).toBe(true);
+	});
+});
+
+describe('hook status from the backend manifest', () => {
+	test('a rejected library hook warns at once, with the reason', async () => {
+		const { lib, port } = await setup();
+		port.manifest = { version: 1, expected: [], rejected: [{ id: VISIBILITY_HOOK_ID, reason: 'bad regex' }] };
+		const lib2 = new LibraryService(new TagStorage(new Backend()), port, new FakeClock());
+		lib2.start();
+		await flush();
+		expect(lib2.getState().seamStatus).toBe('warning');
+		expect(lib2.getState().warning).toContain('rejected (bad regex)');
+		lib.stop();
+	});
+
+	test('hooks disabled by a broken definitions file warn with the load error', async () => {
+		const port = new FakePort();
+		port.manifest = JSON.stringify({ version: 1, expected: {}, rejected: {}, error: 'syntax error' });
+		const lib = new LibraryService(new TagStorage(new Backend()), port, new FakeClock());
+		lib.start();
+		await flush();
+		expect(lib.getState().seamStatus).toBe('warning');
+		expect(lib.getState().warning).toContain('syntax error');
+	});
+
+	test('an unreadable manifest falls back to the declared hook', async () => {
+		const port = new FakePort();
+		port.manifest = 'not json';
+		const clock = new FakeClock();
+		const lib = new LibraryService(new TagStorage(new Backend()), port, clock, { graceMs: 1000 });
+		lib.start();
+		await flush();
+		expect(lib.getState().seamStatus).toBe('checking');
+		port.seen.add(VISIBILITY_HOOK_ID);
+		clock.advance(1000);
+		expect(lib.getState().seamStatus).toBe('ok');
 	});
 });

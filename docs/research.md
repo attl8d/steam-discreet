@@ -281,6 +281,8 @@ Library search does its own `BIsHidden` filtering (`pn=en.filter(...!G.md.BIsHid
 
 #### The patch (backend/main.lua)
 
+_Superseded in M3 by hook `library-visibility` in `backend/hook_definitions.lua`, which calls `sdShouldHide` and carries a self-check marker. Kept as the record of what M1 ran._
+
 - file `sp\.js`, find `BIsVisible\(\w+\)\{const \w+=typeof \w+=="number"\?[\w.]+\.GetAppOverviewByAppID\(\w+\):\w+;return [^}]*&&!this\.BIsHidden\(\w+\.appid\)\}`
 - transform appends `&&!(#{{self}}?.sdIsTagged?.(te.appid)??!1)` before the closing brace.
 - Verified in the live `sp.js`: `...&&!this.BIsHidden(te.appid)&&!(window.PLUGIN_LIST['steam-discreet']?.sdIsTagged?.(te.appid)??!1)}`.
@@ -389,9 +391,17 @@ From `sp.js` module 59671 (CollectionStore):
 - Timing: Millennium appends plugin frontends once `App.BFinishedInitBeforeLogin()` is true (`src/typescript/sdk/src/index.ts` `startClient`, Millennium `ca8976d`), i.e. before login and before the Library has app data. The plugin creates the box when its module loads, so lists computed after that depend on it. A list computed before the plugin loaded would not refresh until Steam recomputes it; the live check shows whether that happens.
 - `tests/frontend/steamReactivity.test.ts` models this with real mobx 6: keepAlive `visibleApps`, the count Map and an autorun "sidebar". It shows the lists and counts update on tag, reveal, hide and untag, and that without the box they stay stale (the M1 result).
 
+### Count-only readers (known gap, check live)
+
+A count is recomputed only by the first reader after `ClearAppCounts()`; that reader then depends on the signal. A second reader of the same collection and filter gets the cached number, reads nothing of ours, and would not refresh on the next change. `tests/frontend/steamReactivity.test.ts` shows both: one count-only autorun stays current over several changes, and a second one of the same cache goes stale. Whether Steam has two such readers at once (for example a collection tile count in the Collections view and the same collection's sidebar header) is for the live check. If it does, the fix is a hook on `GetAppCountWithToolsFilter` that reads the signal on a cache hit.
+
 ### Account
 
-`App.m_CurrentUser.strSteamID` (confirmed live in M1) is read every second until it holds a valid SteamID64, then the tag file for that account is opened. Until then nothing is hidden (fail open).
+`App.m_CurrentUser.strSteamID` (confirmed live in M1) is read every second until it holds a valid SteamID64, then the tag file for that account is opened. Until then nothing is hidden (fail open). If opening fails (the RPC throws or the reply is unusable), it is retried with a doubling delay (2 s up to 60 s) and the toggle state carries a warning until the tags load.
+
+### Hook status
+
+The library service reads the backend's manifest (`steam_discreet_hook_manifest`, a JSON string) and runs it through `services/hookStatus.ts` with the marker. So a hook the backend rejected, or a definitions file that failed to load, warns at once with the reason; a startup hook not seen within 60 s warns as missing. If the manifest cannot be read, the hook is assumed to be the declared startup hook.
 
 ### Names used and their status
 
@@ -411,4 +421,4 @@ bun scripts/cdp.ts eval "globalThis.SD_CHECK_APPID = 427520"
 bun scripts/cdp.ts eval @scripts/live/m3-cycle.js
 ```
 
-The script tags the game through the plugin (`PLUGIN_LIST['steam-discreet'].sdLibrary`), and after each of: tagged, revealed, hidden again, untagged, it checks `BIsVisible`, membership and visible counts of All, Installed, Favorites and the game's user collections, that native Hidden and Favorites are unchanged, and that the filter state is unchanged. It untags the game at the end even if a step fails. Also to check by eye: the sidebar row and the counts in the collection headers, exact-name Library search, and Home shelves.
+The script tags the game through the plugin (`PLUGIN_LIST['steam-discreet'].sdLibrary`), and after each of: tagged, revealed, hidden again, untagged, it checks `BIsVisible`, membership and visible counts of All, Installed, Favorites and the game's user collections, that native Hidden and Favorites are unchanged, and that the filter state is unchanged. It untags the game at the end even if a step fails. Also to check by eye, with the game tagged and then revealed: the sidebar row and the counts in the sidebar collection headers, the collection tiles and their counts in the Collections view (a count-only surface, see above), exact-name Library search, and Home shelves.

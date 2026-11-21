@@ -35,6 +35,13 @@ describe("backend/main.lua", function()
         end
     end)
 
+    it("exposes the hook manifest to the frontend as a global", function()
+        assert.is_function(_G.steam_discreet_hook_manifest)
+        -- json (cjson) is only available inside Millennium; without it the call
+        -- returns nil rather than raising.
+        assert.has_no.errors(function() _G.steam_discreet_hook_manifest() end)
+    end)
+
     it("reports the hook manifest for the self-check", function()
         local manifest = plugin.hook_manifest()
         assert.are.equal(1, manifest.version)

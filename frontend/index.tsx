@@ -4,7 +4,10 @@ import { steamLibraryPort } from './integrations/steam';
 import { installLibrary, LibraryService } from './services/library';
 import { millenniumTagRpc, TagStorage } from './services/tagStorage';
 
-const library = new LibraryService(new TagStorage(millenniumTagRpc()), steamLibraryPort());
+const library = new LibraryService(new TagStorage(millenniumTagRpc()), {
+	...steamLibraryPort(),
+	hookManifest: () => backend.steam_discreet_hook_manifest(),
+});
 installLibrary(library);
 // Start now, not in definePlugin, so the signal exists before Steam first
 // computes its Library lists (see services/library.ts).
@@ -24,8 +27,8 @@ export const sdLibrary = {
 	getState: () => library.getState(),
 	isTagged: (appId: number) => library.isTagged(appId),
 	isRevealed: () => library.isRevealed(),
-	setRevealed: (on: boolean) => {
-		library.setRevealed(on);
+	setRevealed: (on: unknown) => {
+		library.setRevealed(on === true);
 	},
 	tagGames: (appIds: readonly number[]) => library.tagGames(appIds),
 	untagGames: (appIds: readonly number[]) => library.untagGames(appIds),
