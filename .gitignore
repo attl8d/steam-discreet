@@ -5,3 +5,4 @@ node_modules/
 *.star
 .DS_Store
 .millennium/lsp/
+/tools/patch-crosscheck/target/

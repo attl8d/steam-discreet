@@ -3,7 +3,7 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-	{ ignores: ['node_modules/', '.millennium/', '.millennium-build/', 'dist/', 'build/'] },
+	{ ignores: ['node_modules/', '.millennium/', '.millennium-build/', 'dist/', 'build/', 'tests/hooks/fixtures/', 'tools/patch-crosscheck/target/'] },
 	js.configs.recommended,
 	...tseslint.configs.strictTypeChecked,
 	{

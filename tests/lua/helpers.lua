@@ -71,7 +71,7 @@ function M.install_millennium_stubs()
 end
 
 local BACKEND_MODULES = {
-    "logger", "millennium", "fs", "main",
+    "logger", "millennium", "fs", "main", "hooks",
     "tagstore.paths", "tagstore.format", "tagstore.fsio", "tagstore.store", "tagstore.rpc",
 }
 local RPC_GLOBALS = { "tags_open", "tags_add", "tags_remove", "tags_clear", "tags_export", "tags_import" }
