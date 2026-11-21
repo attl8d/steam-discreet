@@ -73,11 +73,12 @@ end
 local BACKEND_MODULES = {
     "logger", "millennium", "fs", "main", "hooks",
     "tagstore.paths", "tagstore.format", "tagstore.fsio", "tagstore.store", "tagstore.rpc",
-    "version", "updater", "updater.platform", "http", "utils", "json",
+    "version", "updater", "updater.platform", "http", "utils", "json", "redact",
 }
 local RPC_GLOBALS = {
-    "tags_open", "tags_add", "tags_remove", "tags_clear", "tags_export", "tags_import",
+    "tags_open", "tags_add", "tags_remove", "tags_clear", "tags_export", "tags_import", "tags_preview_import",
     "steam_discreet_update_status", "steam_discreet_update_rollback", "steam_discreet_hook_manifest",
+    "steam_discreet_environment", "steam_discreet_redact",
 }
 
 function M.reset()

@@ -525,6 +525,24 @@ Exact-name search on 1062090: in the results at baseline; tagged with the toggle
 
 So **Working and tested on the Mac:** sidebar, collections, Favorites, exact-name Library search, Recent Games and ordinary What's New entries (data and what Home renders), and Play Next (data; its rendered card not seen). **Not seen live:** takeover events (none were showing in either run, and they cannot be produced on demand; same `BIsVisible` filter as ordinary entries). Windows is still to re-confirm.
 
+## Settings page and diagnostic report (report path live on the Mac; page render pending)
+
+Written 21 November 2026 for T8, from Valve's public `steamui_websrc_all.zip` for build **1794536281** (same zip and hash as in "M3 library hiding"), plus the live M1 findings. No device was reachable from this session, so nothing new here has been seen in the running client yet.
+
+| Name | Used for | Status |
+| --- | --- | --- |
+| `PACKAGE_CL` in the SharedJSContext URL (`location.search`) | Steam build in the report | Live, M1 ("Environment"). Steam's own code reads it the same way: `new URLSearchParams(window.location.search).get("PACKAGE_CL")`. |
+| `appStore.GetAppOverviewByAppID(appid)` | Names in the tagged list | Live, M1 (exists). Source: `return this.m_mapApps.has(Be)?this.m_mapApps.get(Be):null`. |
+| app overview `display_name` | Names in the tagged list | Live on the Mac, build 1794536281 (a string; see the live result below). Steam reads it as `GetAppOverviewByAppID(ka).display_name`. Type-checked; a miss shows "Unknown game". |
+| `ownerWindow.navigator.clipboard.writeText` | Copy report, export | Source only: Steam copies this way (`ownerWindow.navigator.clipboard.writeText(...)`), with a selected textarea and `document.execCommand("copy")` as its own fallback. The page shows the text for copying by hand when both fail. Not a Steam API. |
+| `millennium.version()`, `jit.os`, `jit.arch` (Lua) | Millennium version and OS in the report | `millennium.version()` live, M1. `jit.os` live on the Mac ("OSX"). |
+
+Millennium UI components used: `Field`, `ToggleField` (already live in the earlier settings switch), `TextField` and `DialogButton` (from Millennium's SDK typings, not yet seen rendered). Confirmations are inline (the button turns into confirm and cancel); `showModal` is not used.
+
+Live result, 21 November 2026, Mac client (macOS arm64), build 1794536281, Millennium v3.6.3, plugin at 2157287 (output on branch `live-out/m4-probe`, f1aa05c, `live-out/settings-check.json`): `ok: true`, no errors. `PACKAGE_CL` read as `1794536281`, `display_name` is a string, `sdDiagnostics` is exported, and `navigator.clipboard.writeText` exists. The report showed plugin 0.1.0, Millennium v3.6.3, OSX (arm64), overall ok, tags loaded and writable, `library-visibility` attached, the two on-demand hooks "not seen yet" (the Library was not opened), and the update check error "no published release found (HTTP 404)" as expected with no release. So `display_name` and the report path are **confirmed live on the Mac**. The page itself was not seen rendered: Millennium's settings sidebar is hidden on the Mac build and could not be opened over CDP. Still to check on Windows: the rendered page and its buttons.
+
+Live check: `bun scripts/cdp.ts eval @scripts/live/settings-check.js`. Read-only. It checks `PACKAGE_CL`, that `display_name` is a string for the first app, and prints the diagnostic report through `PLUGIN_LIST['steam-discreet'].sdDiagnostics.report()`. Also to check by eye: the page renders, Copy diagnostic report reaches the clipboard, export and import round-trip, Remove and Remove all, and the rollback button (only shown once an older version is saved).
+
 ## macOS (live, 21 November 2026)
 
 MacBook with Apple Silicon (arm64), macOS 27.2.1. Steam client build **1794536281**, the same build as the Windows findings above, and `sp.js?contenthash=ecfb6699297d77d920fd` is byte-for-byte the same bundle, so the `library-visibility` find pattern matches unchanged.

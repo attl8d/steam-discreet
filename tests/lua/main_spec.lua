@@ -120,6 +120,30 @@ describe("backend/main.lua", function()
         assert.are.equal("json:error", plugin.update_rollback())
     end)
 
+    it("reports plugin and Millennium versions and the OS for the diagnostic report", function()
+        local env = plugin.environment()
+        assert.are.equal(require("version"), env.plugin_version)
+        assert.are.equal("0.0.0-test", env.millennium_version)
+        -- Under LuaJIT (as in Millennium) the jit library names the OS.
+        assert.are.equal(jit.os, env.os)
+        assert.are.equal(jit.arch, env.arch)
+        for key in pairs(env) do
+            assert.is_truthy(({ plugin_version = 1, millennium_version = 1, os = 1, arch = 1 })[key], key)
+        end
+    end)
+
+    it("leaves out a Millennium version that cannot be read", function()
+        stubs.millennium.version = function() error("no host") end
+        local env = plugin.environment()
+        assert.is_nil(env.millennium_version)
+        assert.are.equal(require("version"), env.plugin_version)
+    end)
+
+    it("exposes the environment to the frontend as JSON", function()
+        package.loaded["json"] = { encode = function(v) return "json:" .. v.plugin_version end }
+        assert.are.equal("json:" .. require("version"), _G.steam_discreet_environment())
+    end)
+
     it("keeps loading and unloading when the updater throws", function()
         package.loaded["updater"] = { new = function() error("boom") end }
         assert.has_no.errors(function()

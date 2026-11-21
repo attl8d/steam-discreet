@@ -85,6 +85,28 @@ function tags_import(account, text, mode)
     return guarded(function() return M.store:import(account, text, mode) end)
 end
 
+---@ffi
+---Parse pasted import text without saving anything: how many App IDs it holds.
+---Lets the settings page show counts in the Replace confirmation.
+---@param text string
+---@return table
+function tags_preview_import(text)
+    return guarded(function()
+        local parsed = format.parse_import(text)
+        if parsed.status == "newer" then
+            return { ok = false, error = "import_newer",
+                message = "This export comes from a newer version of Steam Discreet." }
+        end
+        if parsed.status ~= "ok" then
+            return { ok = false, error = "import_invalid",
+                message = "The file is not a tag list: " .. tostring(parsed.reason) }
+        end
+        local count = 0
+        for _ in pairs(parsed.set) do count = count + 1 end
+        return { ok = true, count = count }
+    end)
+end
+
 M.functions = {
     tags_open = tags_open,
     tags_add = tags_add,
@@ -92,6 +114,7 @@ M.functions = {
     tags_clear = tags_clear,
     tags_export = tags_export,
     tags_import = tags_import,
+    tags_preview_import = tags_preview_import,
 }
 
 return M
