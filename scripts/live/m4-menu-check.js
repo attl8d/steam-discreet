@@ -65,14 +65,22 @@
 	// --- Context menu ------------------------------------------------------
 	const names = new Map();
 	for (const a of globalThis.collectionStore?.allGamesCollection?.visibleApps ?? []) names.set(a.display_name, a.appid);
-	const row = [...doc.querySelectorAll('div, span')].find(
-		(e) => e.childElementCount === 0 && names.has(e.textContent) && e.getBoundingClientRect().height > 0,
-	);
-	if (!row) {
+	// Rows are re-rendered (and the old element detached) when a game is hidden
+	// and revealed again, so the row is looked up afresh before every right-click.
+	const findRow = (wanted) =>
+		[...doc.querySelectorAll('div, span')].find(
+			(e) =>
+				e.childElementCount === 0 &&
+				names.has(e.textContent) &&
+				(wanted === undefined || names.get(e.textContent) === wanted) &&
+				e.getBoundingClientRect().height > 0,
+		);
+	const firstRow = findRow();
+	if (!firstRow) {
 		fail('no game row with a known name is on screen; open the Library first');
 		return out;
 	}
-	const appid = names.get(row.textContent);
+	const appid = names.get(firstRow.textContent);
 	out.appid = appid;
 	const findItem = () => {
 		for (const d of docs()) {
@@ -84,6 +92,8 @@
 		return null;
 	};
 	const openMenu = async () => {
+		const row = findRow(appid);
+		if (!row) return { item: null, info: null, error: 'game row not on screen' };
 		const r = row.getBoundingClientRect();
 		row.dispatchEvent(
 			new win.MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: r.x + 5, clientY: r.y + 5, button: 2 }),
@@ -101,10 +111,39 @@
 			: null;
 		return { item, info };
 	};
+	// Closing: Escape on the menu itself, then a click outside it, then the
+	// menu instance's own Hide() found through React. All three only close the
+	// menu; none activates a menu item.
+	const hideViaReact = (el) => {
+		const key = Object.keys(el).find((k) => k.startsWith('__reactFiber$'));
+		for (let f = key ? el[key] : null, i = 0; f && i < 60; f = f.return, i++) {
+			for (const c of [f.memoizedProps?.instance, f.stateNode?.props?.instance, f.memoizedProps?.menu, f.stateNode]) {
+				if (c && c !== el && typeof c.Hide === 'function') {
+					c.Hide();
+					return true;
+				}
+			}
+		}
+		return false;
+	};
 	const closeMenu = async (item) => {
-		const d = item?.ownerDocument ?? doc;
-		d.dispatchEvent(new d.defaultView.KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true }));
-		await sleep(300);
+		if (!item?.isConnected) return 'already closed';
+		const d = item.ownerDocument;
+		const w = d.defaultView;
+		const menuEl = item.parentElement ?? item;
+		menuEl.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true }));
+		await sleep(250);
+		if (!item.isConnected) return 'escape';
+		for (const type of ['mousedown', 'mouseup']) {
+			d.body.dispatchEvent(new w.MouseEvent(type, { bubbles: true, cancelable: true, clientX: 1, clientY: 1 }));
+		}
+		await sleep(250);
+		if (!item.isConnected) return 'outside click';
+		const viaReact = hideViaReact(item);
+		await sleep(250);
+		if (!item.isConnected) return viaReact ? 'Hide()' : 'closed';
+		fail('could not close the context menu; click anywhere in Steam to close it');
+		return 'still open';
 	};
 
 	const startTagged = lib.isTagged(appid);
@@ -115,7 +154,7 @@
 	else if (first.info.label !== (startTagged ? 'Unmark as adult' : 'Mark as adult')) fail(`unexpected label ${first.info.label}`);
 
 	if (!click || !first.item) {
-		await closeMenu(first.item);
+		out.menuClosedBy = await closeMenu(first.item);
 		out.menuClosed = findItem() === null;
 		return out;
 	}
@@ -141,7 +180,7 @@
 		}
 
 		const again = await openMenu();
-		out.steps.push({ step: 'reopened menu while tagged and revealed', menu: again.info });
+		out.steps.push({ step: 'reopened menu while tagged and revealed', menu: again.info, error: again.error ?? null });
 		if (again.info?.label !== 'Unmark as adult') fail('menu did not switch to Unmark');
 		if (again.item) {
 			again.item.click();
