@@ -48,7 +48,14 @@ function M.make_fs_stub()
         local p = io.popen("ls -1A " .. shell_quote(path))
         for name in p:lines() do
             local full = path .. "/" .. name
+            local size
+            local f = io.open(full, "rb")
+            if f then
+                size = f:seek("end")
+                f:close()
+            end
             entries[#entries + 1] = {
+                size = size,
                 name = name,
                 path = full,
                 is_file = sh_ok("test -f " .. shell_quote(full)),

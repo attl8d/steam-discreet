@@ -3,9 +3,12 @@
 --
 -- * A backup holds one account's tag list plus a few facts (format.lua,
 --   "Backup file format"). It never holds the reveal toggle.
--- * The account is recorded as a short hash of the SteamID64, so a restore onto
---   another account can be flagged without writing the ID itself. It hides the
---   ID from a casual reader; it is not encryption.
+-- * The account is recorded as a 4-hex-digit (16-bit) hash of the SteamID64,
+--   so a restore onto another account can be flagged (65535 times in 65536)
+--   without identifying the account. A longer code would not be safe: there are
+--   under 2^32 individual SteamID64s and the salt is public, so every one can
+--   be hashed in minutes and a long code reversed. With 16 bits, each code is
+--   shared by tens of thousands of accounts.
 -- * Files go to a "Steam Discreet" folder in the user's Documents. When no
 --   Documents folder exists or it cannot be written, they go to Backups in the
 --   tag storage folder instead.
@@ -25,6 +28,9 @@ local FALLBACK_NAME = "Backups"
 local FILE_PREFIX = "Steam Discreet backup "
 local MAX_LISTED = 100
 local KEY_SALT = "steam-discreet-account:"
+local KEY_DIGITS = 4
+-- Files larger than this are not ours (a backup of 100,000 games is ~1 MB).
+local MAX_FILE_BYTES = 2 * 1024 * 1024
 
 ---@param deps? { fsio?: table, paths?: table, getenv?: fun(name: string): string|nil, now?: fun(): integer,
 ---              version?: string, logger?: table, hash?: fun(text: string): string }
@@ -51,12 +57,18 @@ function Backups:env(name)
     return nil
 end
 
---- A short, stable code for an account: the first 16 hex digits of
---- SHA-256("steam-discreet-account:" .. SteamID64).
+--- A short, stable code for an account: the first 4 hex digits of
+--- SHA-256("steam-discreet-account:" .. SteamID64). Deliberately ambiguous;
+--- see the top of this file.
 ---@param account string already validated
 function Backups:account_key(account)
+    self.key_cache = self.key_cache or {}
+    local cached = self.key_cache[account]
+    if cached then return cached end
     local hash = self.hash or require("updater.sha256").hex
-    return hash(KEY_SALT .. account):sub(1, 16)
+    local key = hash(KEY_SALT .. account):sub(1, KEY_DIGITS)
+    self.key_cache[account] = key
+    return key
 end
 
 --- Folders backups can live in, best first. Each is { path, kind } where kind
@@ -72,11 +84,14 @@ function Backups:folders()
     end
     local override = self:env("STEAM_DISCREET_BACKUP_DIR")
     if override then add(override, "override") end
-    -- Windows sets USERPROFILE, macOS and Linux set HOME. OneDrive can move
-    -- Documents into the OneDrive folder; the known-folder API is not reachable
-    -- from Lua, so the usual places are tried in turn.
+    -- Windows sets USERPROFILE, macOS and Linux set HOME. OneDrive's Known
+    -- Folder Move puts Documents under %OneDrive% and often leaves an empty
+    -- %USERPROFILE%\Documents behind, so the OneDrive one is tried first. The
+    -- known-folder API is not reachable from Lua, so these are guesses; the path
+    -- shown after a save tells the user where the file went.
     local bases = {}
-    local profile, home = self:env("USERPROFILE"), self:env("HOME")
+    local profile, home, onedrive = self:env("USERPROFILE"), self:env("HOME"), self:env("OneDrive")
+    if onedrive then bases[#bases + 1] = join(onedrive, "Documents") end
     if profile then
         bases[#bases + 1] = join(profile, "Documents")
         bases[#bases + 1] = join(profile, "OneDrive/Documents")
@@ -102,7 +117,7 @@ end
 
 local function plain_name(name)
     return type(name) == "string" and name ~= "" and #name <= 200
-        and not name:find("[/\\%c]") and not name:find("%.%.") and name:sub(-4):lower() == ".txt"
+        and not name:find("[/\\:%c]") and not name:find("%.%.") and name:sub(-4):lower() == ".txt"
 end
 
 --- A file name that does not exist yet: "Steam Discreet backup 2026-11-21.txt",
@@ -209,12 +224,13 @@ function Backups:list(account)
     local found = {}
     for index, folder in ipairs(folders) do
         if self.fsio.is_dir(folder.path) then
-            local names, err = self.fsio.list_files(folder.path)
-            if not names then
+            local files, err = self.fsio.list_files(folder.path)
+            if not files then
                 self:log("warn", "cannot list " .. folder.kind .. " folder: " .. tostring(err))
             else
-                for _, name in ipairs(names) do
-                    if plain_name(name) then
+                for _, file in ipairs(files) do
+                    local name = file.name
+                    if plain_name(name) and (file.size == nil or file.size <= MAX_FILE_BYTES) then
                         local text = self.fsio.read(self.paths.join(folder.path, name))
                         local info = text and self:describe(text, account)
                             or { status = "invalid", reason = "cannot read" }
@@ -246,6 +262,7 @@ function Backups:list(account)
         ok = true,
         entries = table.concat(lines, "\n"),
         count = #lines,
+        total = #found,
         folder = primary and display(primary.path) or "",
     }
 end

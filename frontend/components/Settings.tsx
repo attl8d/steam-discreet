@@ -3,7 +3,15 @@ import { Component, type CSSProperties, type ReactNode, useCallback, useEffect, 
 import type { AppId } from '../domain/appId';
 import { copyText } from '../integrations/steam/clipboard';
 import { canRollBack, type UpdateStatus } from '../services/backendInfo';
-import { type BackupEntry, type BackupList, describeEntry, type ImportPreview, importQuestion } from '../services/backupFiles';
+import {
+	type BackupEntry,
+	type BackupList,
+	describeEntry,
+	type ImportPreview,
+	importQuestion,
+	restorable,
+	restoreQuestion,
+} from '../services/backupFiles';
 import type { HookState } from '../services/hookStatus';
 import { getState, setRevealed, subscribe } from '../services/library';
 import { type ActionResult, installedSettings, type SettingsService, type SettingsView } from '../services/settings';
@@ -323,7 +331,7 @@ function BackupSection({ settings }: { settings: SettingsService }) {
 		<>
 			<Field
 				label="Save backup"
-				description="Saves your tag list to a file in your Documents folder, under Steam Discreet. The file lists the App IDs of your tagged games, so keep it private."
+				description="Saves your tag list to a file in your Documents folder, under Steam Discreet. The file lists the App IDs of your tagged games, so keep it private. If your Documents folder syncs to OneDrive or iCloud, the backup is uploaded too. On a Mac, macOS may first ask whether Steam can use your Documents folder."
 			>
 				<DialogButton
 					style={buttonStyle}
@@ -354,7 +362,7 @@ function BackupSection({ settings }: { settings: SettingsService }) {
 			)}
 			{shown.map((entry) =>
 				chosen?.id === entry.id && entry.count !== null ? (
-					<Field key={entry.id} label={entry.name} indentLevel={1} description={importQuestion('replace', { count: entry.count, sameAccount: entry.sameAccount }, view.tags.tags.size, 'backup')}>
+					<Field key={entry.id} label={entry.name} indentLevel={1} description={restoreQuestion({ count: entry.count, sameAccount: entry.sameAccount }, view.tags.tags.size)}>
 						<DialogButton
 							style={buttonStyle}
 							disabled={!canEdit}
@@ -384,7 +392,7 @@ function BackupSection({ settings }: { settings: SettingsService }) {
 					</Field>
 				) : (
 					<Field key={entry.id} label={entry.name} indentLevel={1} padding="compact" description={describeEntry(entry)}>
-						{entry.status === 'ok' && entry.count !== null && (
+						{restorable(entry) && (
 							<DialogButton
 								style={buttonStyle}
 								disabled={!canEdit}
@@ -399,8 +407,8 @@ function BackupSection({ settings }: { settings: SettingsService }) {
 					</Field>
 				),
 			)}
-			{list !== null && list.entries.length > MAX_BACKUPS && (
-				<Field indentLevel={1} description={`${String(list.entries.length - MAX_BACKUPS)} older backups are not shown. They are in ${list.folder}.`} />
+			{list !== null && list.total > shown.length && (
+				<Field indentLevel={1} description={`${String(list.total - shown.length)} older backups are not shown. They are in ${list.folder}.`} />
 			)}
 			<ResultLine result={result} />
 		</>

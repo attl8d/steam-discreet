@@ -107,7 +107,7 @@ end
 --   # comment lines explain the file to whoever opens it
 --   saved 2026-11-21T19:40:00Z
 --   plugin 0.1.0
---   account 3f2a9c1b7d4e8a60
+--   account 3f2a
 --   tags 2
 --   570
 --   730
@@ -116,8 +116,10 @@ end
 -- `key value` lines before `tags` are facts. A reader ignores keys it does not
 -- know, so later version 1 writers can add settings without breaking older
 -- readers; anything an older reader must not ignore needs version 2. The
--- `account` value is a hash of the SteamID64 (backend/tagstore/backups.lua),
--- never the ID itself. The reveal toggle is never part of a backup.
+-- `account` value is a 4-hex-digit hash of the SteamID64, short on purpose so
+-- it cannot be reversed to the account (backend/tagstore/backups.lua). The
+-- reveal toggle is never part of a backup, and a reader never applies a fact
+-- to it: only `saved` and `account` are read.
 
 M.BACKUP_VERSION = 1
 M.BACKUP_MAGIC = "steam-discreet-backup"

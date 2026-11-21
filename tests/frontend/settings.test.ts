@@ -380,6 +380,13 @@ describe('backup files', () => {
 		expect([...tags.tags].sort((a, b) => a - b)).toEqual([570, 730]);
 	});
 
+	test('restoring never turns on Show adult games', async () => {
+		const { settings, library } = await setup([570]);
+		expect(library.getState().revealed).toBe(false);
+		await settings.restoreBackup('1:Steam Discreet backup 2026-11-21.txt', 'replace');
+		expect(library.getState().revealed).toBe(false);
+	});
+
 	test('restore with Add keeps the current tags', async () => {
 		const { settings, tags } = await setup([570]);
 		await settings.restoreBackup('1:Steam Discreet backup 2026-11-21.txt', 'merge');

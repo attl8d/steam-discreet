@@ -34,6 +34,8 @@ export interface BackupList {
 	/** Where the next backup goes. */
 	readonly folder: string;
 	readonly entries: readonly BackupEntry[];
+	/** How many were found, which can be more than the backend lists. */
+	readonly total: number;
 }
 
 export interface SavedBackup {
@@ -130,7 +132,8 @@ export function parseListReply(raw: unknown): BackupList | Failure {
 			location: loc,
 		});
 	}
-	return { ok: true, folder: r.folder, entries };
+	const total = count(r.total);
+	return { ok: true, folder: r.folder, entries, total: total === null ? entries.length : Math.max(total, entries.length) };
 }
 
 export function parseReadReply(raw: unknown): { readonly ok: true; readonly text: string } | Failure {
@@ -153,6 +156,7 @@ export function formatSaved(date: Date): string {
 export function describeEntry(entry: BackupEntry, format: (date: Date) => string = formatSaved): string {
 	if (entry.status === 'newer') return 'Made by a newer version of Steam Discreet. Update the plugin to restore it.';
 	if (entry.status === 'invalid') return 'Damaged or cut short, so it cannot be restored.';
+	if (entry.count === 0) return 'Empty, nothing to restore.';
 	const parts = [entry.count === null ? 'Tag list' : games(entry.count)];
 	if (entry.saved !== null) parts.push(`saved ${format(entry.saved)}`);
 	if (entry.sameAccount === 'no') parts.push('from another Steam account');
@@ -175,5 +179,20 @@ export function importQuestion(
 	return (
 		`${other}Replace your ${games(current)} with the ${games(incoming.count)} in ${what}? ` +
 		`Games not in ${what} are untagged. The current list is saved first, and an Undo button puts it back until Steam restarts.`
+	);
+}
+
+/** A listed backup that Restore can be offered for. */
+export function restorable(entry: BackupEntry): boolean {
+	return entry.status === 'ok' && entry.count !== null && entry.count > 0;
+}
+
+/** The confirmation beside a chosen backup's Replace and Add buttons. */
+export function restoreQuestion(incoming: { readonly count: number; readonly sameAccount: SameAccount }, current: number): string {
+	const other = incoming.sameAccount === 'no' ? 'This backup is from another Steam account. ' : '';
+	return (
+		`${other}This backup has ${games(incoming.count)}; you have ${games(current)} tagged now. ` +
+		'Replace swaps your list for the backup: games not in it are untagged, and an Undo button puts your current list back until Steam restarts. ' +
+		'Add to my tags keeps your current tags and adds the backup\'s.'
 	);
 }

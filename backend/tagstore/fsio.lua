@@ -80,9 +80,9 @@ function M.is_dir(path)
     return fs.is_directory(path) == true
 end
 
---- Names of the regular files directly in `dir`, through Millennium's
---- `fs.list` (an array of entries with `name` and `is_file`).
----@return string[]|nil names
+--- The regular files directly in `dir`, as { name, size? }, through
+--- Millennium's `fs.list` (an array of entries with `name`, `is_file`, `size`).
+---@return { name: string, size: integer|nil }[]|nil files
 ---@return string|nil err
 function M.list_files(dir)
     local ok, entries, err = pcall(fs.list, dir)
@@ -91,7 +91,7 @@ function M.list_files(dir)
     local names = {}
     for _, entry in ipairs(entries) do
         if type(entry) == "table" and entry.is_file == true and type(entry.name) == "string" then
-            names[#names + 1] = entry.name
+            names[#names + 1] = { name = entry.name, size = type(entry.size) == "number" and entry.size or nil }
         end
     end
     return names

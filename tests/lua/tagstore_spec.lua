@@ -676,7 +676,7 @@ describe("tagstore.backups (real files)", function()
         local text = helpers.read_file(saved.path)
         assert.is_nil(text:find(ACCOUNT, 1, true))
         assert.is_nil(text:find("38000000001", 1, true)) -- the 32-bit account ID's digits either
-        assert.truthy(text:find("\naccount %x+\n"))
+        assert.truthy(text:find("\naccount %x%x%x%x\n"))
     end)
 
     it("uses OneDrive Documents on Windows when the plain Documents folder is missing", function()
@@ -775,7 +775,8 @@ describe("tagstore.backups (real files)", function()
         assert.are.equal(helpers.read_file(saved.path), read.text)
         helpers.write_file(root .. "/secret.txt", "x")
         local bad = {
-            "1:../secret.txt", "1:..\\secret.txt", "1:sub/x.txt", "9:" .. saved.name, saved.name, "1:x.lua", 5,
+            "1:../secret.txt", "1:..\\secret.txt", "1:sub/x.txt", "9:" .. saved.name, saved.name, "1:x.lua",
+            "1:a.txt:stream.txt", 5,
         }
         for _, id in ipairs(bad) do
             local r = b:read(id)
@@ -797,10 +798,68 @@ describe("tagstore.backups (real files)", function()
         assert.are.equal("invalid", b:describe("nope", ACCOUNT).status)
     end)
 
-    it("derives the account code from SHA-256, stable across runs", function()
+    it("derives a 4-hex-digit account code from SHA-256, stable and too short to identify anyone", function()
         local sha = require("updater.sha256")
-        assert.are.equal(sha.hex("steam-discreet-account:" .. ACCOUNT):sub(1, 16), make():account_key(ACCOUNT))
-        assert.are_not.equal(make():account_key(ACCOUNT), make():account_key(OTHER))
+        local key = make():account_key(ACCOUNT)
+        assert.are.equal(sha.hex("steam-discreet-account:" .. ACCOUNT):sub(1, 4), key)
+        assert.are.equal(4, #key)
+        assert.are_not.equal(key, make():account_key(OTHER))
+    end)
+
+    it("hashes the account once per list, not once per file", function()
+        os.execute("mkdir -p '" .. home .. "/Documents'")
+        local calls = 0
+        local sha = require("updater.sha256")
+        local b = make({ hash = function(t) calls = calls + 1; return sha.hex(t) end })
+        b:save(ACCOUNT, set_of(1))
+        b:save(ACCOUNT, set_of(2))
+        b:save(ACCOUNT, set_of(3))
+        calls = 0
+        b.key_cache = nil
+        b:list(ACCOUNT)
+        assert.are.equal(1, calls)
+    end)
+
+    it("prefers %OneDrive%\\Documents over a leftover empty profile Documents", function()
+        os.execute("mkdir -p '" .. home .. "/Documents' '" .. home .. "/OD/Documents'")
+        env = { USERPROFILE = home, OneDrive = home .. "/OD" }
+        assert.are.equal(home .. "/OD/Documents/Steam Discreet", make():save(ACCOUNT, set_of(1)).folder)
+    end)
+
+    it("skips files too large to be a backup, and reports the uncapped total", function()
+        local b = make()
+        local saved = b:save(ACCOUNT, set_of(1))
+        local big = {}
+        for i = 1, 400000 do big[i] = tostring(i) end
+        helpers.write_file(saved.folder .. "/Steam Discreet backup huge.txt",
+            "steam-discreet-backup 1\ntags 400000\n" .. table.concat(big, "\n") .. "\nend 400000\n")
+        local listed = b:list(ACCOUNT)
+        assert.are.equal(1, listed.count)
+        assert.are.equal(1, listed.total)
+        for i = 1, 105 do
+            helpers.write_file(string.format("%s/Steam Discreet backup x%03d.txt", saved.folder, i),
+                format.serialize_backup(set_of(i), {}))
+        end
+        listed = b:list(ACCOUNT)
+        assert.are.equal(100, listed.count)
+        assert.are.equal(106, listed.total)
+    end)
+
+    it("restores only the tags from a backup with settings facts, never the reveal state", function()
+        local text = "steam-discreet-backup 1\nreveal 1\nshow_adult_games true\ntags 1\n730\nend 1\n"
+        local info = make():describe(text, ACCOUNT)
+        assert.are.same({ status = "ok", kind = "backup", count = 1, same_account = "unknown" }, info)
+        local Store = require("tagstore.store")
+        local store = Store.new({ paths = paths })
+        store:open(ACCOUNT)
+        local result = store:import(ACCOUNT, text, "replace")
+        assert.are.equal("730", result.ids)
+        for key in pairs(result) do
+            assert.is_nil(key:find("reveal", 1, true))
+            assert.is_nil(key:find("adult", 1, true))
+        end
+        -- The tag file on disk holds App IDs only.
+        assert.are.equal("steam-discreet-tags 1\n730\nend 1\n", helpers.read_file(paths.files(root, ACCOUNT).main))
     end)
 end)
 

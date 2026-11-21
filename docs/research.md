@@ -552,9 +552,11 @@ Read from `.millennium/lsp/lua-types/fs.lua` (Starlight 1.1.7), 21 November 2026
 | `fs.list(path)` | `backend/tagstore/fsio.lua`, `list_files` | Array of `fs.Entry` (`name`, `path`, `is_file`, `is_directory`, `is_symlink`, `size`), or `nil, message`. Called under `pcall`; a failure only hides the list, and a backup can still be pasted into Import. |
 | `fs.is_directory(path)` | `fsio.is_dir` | Already used by `ensure_dir` since M2. |
 
-Folders, in order (`backend/tagstore/backups.lua`): `STEAM_DISCREET_BACKUP_DIR`, then the first existing of `%USERPROFILE%\Documents`, `%USERPROFILE%\OneDrive\Documents`, `$HOME/Documents`, with `Steam Discreet` appended, then `<tag storage root>/Backups`. Lua cannot call the Windows known-folder API, so a Documents folder moved elsewhere is not found and the fallback is used. Writing has been confirmed only under `%APPDATA%\SteamDiscreet` (above); the backend falls back there when the Documents write fails.
+Folders, in order (`backend/tagstore/backups.lua`): `STEAM_DISCREET_BACKUP_DIR`, then the first existing of `%OneDrive%\Documents` (Known Folder Move often leaves an empty `%USERPROFILE%\Documents` behind), `%USERPROFILE%\Documents`, `%USERPROFILE%\OneDrive\Documents`, `$HOME/Documents`, with `Steam Discreet` appended, then `<tag storage root>/Backups`. Lua cannot call the Windows known-folder API, so a Documents folder moved elsewhere is not found and the fallback is used. Writing has been confirmed only under `%APPDATA%\SteamDiscreet` (above); the backend falls back there when the Documents write fails.
 
-Live check to run on the PC: Save backup twice (second file gets ` (2)`), Find backups lists both, Restore… Replace then Undo, and a backup saved on another account shows the warning. Note whether Documents is under OneDrive.
+Live check to run on the PC: Save backup twice (second file gets ` (2)`), Find backups lists both, Restore… Replace then Undo, and a backup saved on another account shows the warning. Note whether Documents is under OneDrive and which folder the save used.
+
+Live check to run on the Mac: the first Save backup or Find backups touches `~/Documents`, which should bring up the macOS prompt "Steam would like to access files in your Documents folder". Allow it and check the file lands in `~/Documents/Steam Discreet`; then deny it (System Settings, Privacy & Security, Files and Folders) and check the save falls back to `~/Library/Application Support/SteamDiscreet/Backups` with the reason shown.
 
 ## macOS (live, 21 November 2026)
 

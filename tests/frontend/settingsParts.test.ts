@@ -13,6 +13,8 @@ import {
 	parseReadReply,
 	parseSaved,
 	parseSaveReply,
+	restorable,
+	restoreQuestion,
 } from '../../frontend/services/backupFiles';
 import { clean } from '../../frontend/services/diagnostics';
 
@@ -209,7 +211,10 @@ describe('backup file replies', () => {
 			['1:a.txt', 'ok', 4, 'no'],
 			['2:c.txt', 'newer', null, 'yes'],
 		]);
-		expect(parseListReply({ ok: true, folder: 'F', entries: '' })).toEqual({ ok: true, folder: 'F', entries: [] });
+		expect(reply.total).toBe(2);
+		expect(parseListReply({ ok: true, folder: 'F', entries: '' })).toEqual({ ok: true, folder: 'F', entries: [], total: 0 });
+		const capped = parseListReply({ ok: true, folder: 'F', entries: '1:a.txt\ta.txt\tok\t4\t\tno\tdocuments', total: 150 });
+		expect(capped.ok && capped.total).toBe(150);
 		expect(parseListReply({ ok: true, entries: {} }).ok).toBe(false);
 	});
 
@@ -237,7 +242,20 @@ describe('backup wording', () => {
 			"3 games, from another Steam account, in the plugin's own folder",
 		);
 		expect(describeEntry({ ...entry, status: 'newer' }, fmt)).toContain('newer version');
+		expect(describeEntry({ ...entry, count: 0 }, fmt)).toBe('Empty, nothing to restore.');
+		expect(restorable(entry)).toBe(true);
+		for (const e of [{ ...entry, count: 0 }, { ...entry, status: 'invalid' as const }, { ...entry, status: 'newer' as const }]) {
+			expect(restorable(e)).toBe(false);
+		}
 		expect(describeEntry({ ...entry, status: 'invalid' }, fmt)).toContain('cannot be restored');
+	});
+
+	test('the restore confirmation explains both Replace and Add', () => {
+		const text = restoreQuestion({ count: 2, sameAccount: 'no' }, 5);
+		expect(text).toStartWith('This backup is from another Steam account. This backup has 2 games; you have 5 games tagged now.');
+		expect(text).toContain('Replace swaps your list');
+		expect(text).toContain('Undo');
+		expect(text).toContain('Add to my tags keeps your current tags');
 	});
 
 	test('the confirmation names both counts, the Undo and another account', () => {
