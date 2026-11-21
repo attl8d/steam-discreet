@@ -73,8 +73,12 @@ end
 local BACKEND_MODULES = {
     "logger", "millennium", "fs", "main", "hooks",
     "tagstore.paths", "tagstore.format", "tagstore.fsio", "tagstore.store", "tagstore.rpc",
+    "version", "updater", "updater.platform", "http", "utils", "json",
 }
-local RPC_GLOBALS = { "tags_open", "tags_add", "tags_remove", "tags_clear", "tags_export", "tags_import" }
+local RPC_GLOBALS = {
+    "tags_open", "tags_add", "tags_remove", "tags_clear", "tags_export", "tags_import",
+    "steam_discreet_update_status", "steam_discreet_update_rollback",
+}
 
 function M.reset()
     for _, name in ipairs(BACKEND_MODULES) do
