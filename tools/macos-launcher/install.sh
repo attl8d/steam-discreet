@@ -44,11 +44,38 @@ current_handler() {
     osascript -l JavaScript -e "ObjC.import('CoreServices'); ObjC.unwrap(ObjC.castRefToObject(\$.LSCopyDefaultHandlerForURLScheme(\$('steam'))))" 2>/dev/null || echo "none"
 }
 
+valve_in_spotlight() {
+    mdfind -onlyin "$(dirname "$valve_app")" "kMDItemCFBundleIdentifier == '$valve_id'" 2>/dev/null | grep -qx "$valve_app"
+}
+
+# Both apps are called Steam and Spotlight shows only the one opened most.
+# macOS has no supported way for a script to exclude an app from Spotlight
+# (and App Management blocks changing Steam.app), so walk the user through it.
+guide_spotlight() {
+    valve_in_spotlight || return 0
+    cat <<MSG
+
+One manual step if you start Steam from Spotlight (Cmd-Space):
+Spotlight still lists Valve's Steam.app and will keep opening plain Steam.
+Opening Spotlight settings and showing Steam.app in Finder now: under
+Search Privacy, click + (or drag Steam.app from Finder into the list).
+Remove it from the list later to undo. Check with: $0 --status
+MSG
+    open "x-apple.systempreferences:com.apple.Spotlight-Settings.extension" 2>/dev/null \
+        || open -b com.apple.systempreferences
+    open -R "$valve_app"
+}
+
 status() {
     for app in "$launcher" "$plain"; do
         if [ -d "$app" ]; then echo "installed: $app"; else echo "missing:   $app"; fi
     done
     echo "steam:// handler: $(current_handler)"
+    if valve_in_spotlight; then
+        echo "Spotlight: still lists Valve's Steam.app, so Cmd-Space \"steam\" may open plain Steam (see README)"
+    else
+        echo "Spotlight: Valve's Steam.app is hidden"
+    fi
     echo "log: $HOME/Library/Logs/SteamLauncher.log"
 }
 
@@ -140,3 +167,4 @@ set_handler "$launcher_id"
 
 echo "Installed. Pin $launcher in the Dock in place of Steam.app."
 status
+guide_spotlight

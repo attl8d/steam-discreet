@@ -17,7 +17,7 @@ tools/macos-launcher/install.sh --uninstall  # remove both apps (only if they ar
 
 After installing:
 
-1. Drag `~/Applications/Steam.app` to the Dock and remove Valve's Steam icon. If you start Steam from Spotlight: both apps are called Steam and Spotlight shows only the one opened most (Valve's). Hide Valve's in System Settings, Spotlight, Search Privacy: click +, press Cmd-Shift-G and add `/Applications/Steam.app`. Steam.app itself is not changed; remove the entry to undo.
+1. Drag `~/Applications/Steam.app` to the Dock and remove Valve's Steam icon. If you start Steam from Spotlight: both apps are called Steam and Spotlight shows only the one opened most (Valve's). Hide Valve's in System Settings, Spotlight, Search Privacy: click +, press Cmd-Shift-G and add `/Applications/Steam.app`. `install.sh` opens that page and shows Steam.app in Finder when it is still indexed, and `--status` reports it. Steam.app itself is not changed; remove the entry to undo. This can't be scripted: macOS has no supported API for Spotlight exclusions, and App Management blocks even `chflags hidden` on Steam.app.
 2. In Steam, Settings, Interface, turn off "Run Steam when my computer starts", then add `~/Applications/Steam.app` under System Settings, General, Login Items.
 
 Log: `~/Library/Logs/SteamLauncher.log`.
