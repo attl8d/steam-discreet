@@ -28,6 +28,28 @@ Status: scaffold only. No hiding logic exists yet. See [docs/PLAN.md](docs/PLAN.
 
 Lua specs live in `tests/lua/*_spec.lua`. `tests/lua/helpers.lua` stubs the `logger` and `millennium` modules that Millennium injects, so backend modules can be required directly.
 
+## Releases and self-update
+
+Bump `version` in `millennium.toml` and `backend/version.lua` (a test keeps them equal), merge, then push a matching tag:
+
+```sh
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+`.github/workflows/release.yml` runs the CI checks, packs `steam-discreet.star` with `starlight pack --release`, writes `steam-discreet.star.sha256` and publishes both on a GitHub release.
+
+The installed plugin checks this repo's latest release in the background after each Steam start (`backend/updater.lua`). A newer release is downloaded to `<Millennium plugins>/steam-discreet.update/`, checked against its size, the `.star` header, the `.sha256` file and GitHub's own asset digest, and staged. When Steam shuts down, the running file is copied to `previous.star` and the staged file is renamed over `steam-discreet.star`, so the update loads at the next start. A failed check changes nothing and is recorded in `state.json`. The updater never reads or writes the tag file.
+
+The check calls the GitHub API without a token, so it only works while this repo is public.
+
+### Rolling back
+
+The settings page (T8) will call the backend method `steam_discreet_update_rollback`. It stages the saved previous version, which replaces the current one at the next Steam shutdown, and the current version is then skipped by future checks. A later, higher release is installed as usual.
+
+By hand: quit Steam, copy `<Millennium plugins>/steam-discreet.update/previous.star` over `<Millennium plugins>/steam-discreet.star`, and start Steam. At startup the plugin sees it is older than the version it last installed and skips that version, so the rollback sticks.
+
+To allow a skipped version again, delete `skip_version` from `steam-discreet.update/state.json`.
+
 ## Layout
 
 ```text
