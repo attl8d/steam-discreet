@@ -463,6 +463,10 @@ First run, 21 November 2026, Mac client (macOS arm64), build 1794536281, plugin 
 | Cleanup | Untagged, toggle off, game visible |
 | Closing the menu | A synthetic Escape on the document did not close it (script bug, fixed: Escape on the menu, then a click outside, then the menu's `Hide()`) |
 
+Rerun with the fixed script (450ceee, same plugin build; outputs at `live-out/m4-probe` 7c5fa86): read-only run ok, menu closed by Escape on the menu. Click run ok through the whole cycle: Mark (tagged, menu closed), toggle on (revealed, `Active`), menu reopened showing **Unmark as adult** in the same place, Unmark (untagged), toggle off. The tag file ended empty. **Working and tested on the Mac; to be re-confirmed on Windows.**
+
+One read-only run made a few seconds after Steam started found no item and no `game-context-menu` marker, and a run 5 seconds later passed. Its output was not kept. The marker is set by the patched `render()` itself, before the plugin is called, so a menu rendered by patched code always sets it, even when the plugin frontend has not loaded yet. No marker therefore means the menu came from unpatched code (or did not open). That fits the first UI load: Millennium reloads the UI with patches once the backends are ready (see "Loading"). It is the same startup window PLAN.md accepts for the brief flash. Separately, if a menu opens after the reload but before the plugin frontend has loaded, the marker is set and that one menu has no item; the next one does. The check script now records `markersBefore` and `markersAfterMenu`, so a repeat would show which case it was.
+
 ## macOS (live, 21 November 2026)
 
 MacBook with Apple Silicon (arm64), macOS 27.2.1. Steam client build **1794536281**, the same build as the Windows findings above, and `sp.js?contenthash=ecfb6699297d77d920fd` is byte-for-byte the same bundle, so the `library-visibility` find pattern matches unchanged.
