@@ -20,8 +20,15 @@
               "uc-xJwr1zvKrwiS": false
             },
             "dom": {
-              "imgs": 0,
-              "textHits": 0
+              "sidebarFound": true,
+              "home": {
+                "imgs": 0,
+                "labels": 0
+              },
+              "sidebar": {
+                "imgs": 0,
+                "labels": 0
+              }
             },
             "hidden": false,
             "favorite": true,
@@ -43,8 +50,15 @@
               "uc-xJwr1zvKrwiS": true
             },
             "dom": {
-              "imgs": 3,
-              "textHits": 2
+              "sidebarFound": true,
+              "home": {
+                "imgs": 2,
+                "labels": 1
+              },
+              "sidebar": {
+                "imgs": 1,
+                "labels": 1
+              }
             },
             "hidden": false,
             "favorite": true,
@@ -66,8 +80,15 @@
               "uc-xJwr1zvKrwiS": false
             },
             "dom": {
-              "imgs": 0,
-              "textHits": 0
+              "sidebarFound": true,
+              "home": {
+                "imgs": 0,
+                "labels": 0
+              },
+              "sidebar": {
+                "imgs": 0,
+                "labels": 0
+              }
             },
             "hidden": false,
             "favorite": true,
@@ -89,8 +110,15 @@
               "uc-xJwr1zvKrwiS": true
             },
             "dom": {
-              "imgs": 3,
-              "textHits": 2
+              "sidebarFound": true,
+              "home": {
+                "imgs": 2,
+                "labels": 1
+              },
+              "sidebar": {
+                "imgs": 1,
+                "labels": 1
+              }
             },
             "hidden": false,
             "favorite": true,
@@ -110,8 +138,15 @@
           "uc-xJwr1zvKrwiS": true
         },
         "dom": {
-          "imgs": 3,
-          "textHits": 2
+          "sidebarFound": true,
+          "home": {
+            "imgs": 2,
+            "labels": 1
+          },
+          "sidebar": {
+            "imgs": 1,
+            "labels": 1
+          }
         },
         "hidden": false,
         "favorite": true,
@@ -136,8 +171,15 @@
               "uc-FlTWQ6LxoQRV": false
             },
             "dom": {
-              "imgs": 0,
-              "textHits": 0
+              "sidebarFound": true,
+              "home": {
+                "imgs": 0,
+                "labels": 0
+              },
+              "sidebar": {
+                "imgs": 0,
+                "labels": 0
+              }
             },
             "hidden": false,
             "favorite": false,
@@ -158,8 +200,15 @@
               "uc-FlTWQ6LxoQRV": true
             },
             "dom": {
-              "imgs": 1,
-              "textHits": 1
+              "sidebarFound": true,
+              "home": {
+                "imgs": 1,
+                "labels": 1
+              },
+              "sidebar": {
+                "imgs": 0,
+                "labels": 0
+              }
             },
             "hidden": false,
             "favorite": false,
@@ -180,8 +229,15 @@
               "uc-FlTWQ6LxoQRV": false
             },
             "dom": {
-              "imgs": 0,
-              "textHits": 0
+              "sidebarFound": true,
+              "home": {
+                "imgs": 0,
+                "labels": 0
+              },
+              "sidebar": {
+                "imgs": 0,
+                "labels": 0
+              }
             },
             "hidden": false,
             "favorite": false,
@@ -202,8 +258,15 @@
               "uc-FlTWQ6LxoQRV": true
             },
             "dom": {
-              "imgs": 1,
-              "textHits": 1
+              "sidebarFound": true,
+              "home": {
+                "imgs": 1,
+                "labels": 1
+              },
+              "sidebar": {
+                "imgs": 0,
+                "labels": 0
+              }
             },
             "hidden": false,
             "favorite": false,
@@ -222,8 +285,15 @@
           "uc-FlTWQ6LxoQRV": true
         },
         "dom": {
-          "imgs": 1,
-          "textHits": 1
+          "sidebarFound": true,
+          "home": {
+            "imgs": 1,
+            "labels": 1
+          },
+          "sidebar": {
+            "imgs": 0,
+            "labels": 0
+          }
         },
         "hidden": false,
         "favorite": false,
@@ -249,8 +319,15 @@
               "uc-A*+eSA9oq65wf": false
             },
             "dom": {
-              "imgs": 0,
-              "textHits": 0
+              "sidebarFound": true,
+              "home": {
+                "imgs": 0,
+                "labels": 0
+              },
+              "sidebar": {
+                "imgs": 0,
+                "labels": 0
+              }
             },
             "hidden": false,
             "favorite": false,
@@ -272,8 +349,15 @@
               "uc-A*+eSA9oq65wf": true
             },
             "dom": {
-              "imgs": 1,
-              "textHits": 1
+              "sidebarFound": true,
+              "home": {
+                "imgs": 0,
+                "labels": 0
+              },
+              "sidebar": {
+                "imgs": 1,
+                "labels": 1
+              }
             },
             "hidden": false,
             "favorite": false,
@@ -295,8 +379,15 @@
               "uc-A*+eSA9oq65wf": false
             },
             "dom": {
-              "imgs": 0,
-              "textHits": 0
+              "sidebarFound": true,
+              "home": {
+                "imgs": 0,
+                "labels": 0
+              },
+              "sidebar": {
+                "imgs": 0,
+                "labels": 0
+              }
             },
             "hidden": false,
             "favorite": false,
@@ -318,8 +409,15 @@
               "uc-A*+eSA9oq65wf": true
             },
             "dom": {
-              "imgs": 1,
-              "textHits": 1
+              "sidebarFound": true,
+              "home": {
+                "imgs": 0,
+                "labels": 0
+              },
+              "sidebar": {
+                "imgs": 1,
+                "labels": 1
+              }
             },
             "hidden": false,
             "favorite": false,
@@ -339,8 +437,15 @@
           "uc-A*+eSA9oq65wf": true
         },
         "dom": {
-          "imgs": 1,
-          "textHits": 1
+          "sidebarFound": true,
+          "home": {
+            "imgs": 0,
+            "labels": 0
+          },
+          "sidebar": {
+            "imgs": 1,
+            "labels": 1
+          }
         },
         "hidden": false,
         "favorite": false,
@@ -354,6 +459,109 @@
     "playNextStore": true,
     "libraryEventStore": true
   },
+  "search": {
+    "appid": 1062090,
+    "search": "<exact name>",
+    "steps": [
+      {
+        "name": "tagged, toggle off",
+        "problems": [],
+        "snapshot": {
+          "visible": false,
+          "found": false,
+          "dom": {
+            "sidebarFound": true,
+            "home": {
+              "imgs": 0,
+              "labels": 0
+            },
+            "sidebar": {
+              "imgs": 0,
+              "labels": 0
+            }
+          },
+          "filter": "{\"nFormatVersion\":2,\"strSearchText\":\"<game>\",\"filterGroups\":[{\"rgOptions\":[],\"bAcceptUnion\":true},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false}],\"setSuggestions\":{}}"
+        }
+      },
+      {
+        "name": "toggle on",
+        "problems": [],
+        "snapshot": {
+          "visible": true,
+          "found": true,
+          "dom": {
+            "sidebarFound": true,
+            "home": {
+              "imgs": 2,
+              "labels": 1
+            },
+            "sidebar": {
+              "imgs": 1,
+              "labels": 1
+            }
+          },
+          "filter": "{\"nFormatVersion\":2,\"strSearchText\":\"<game>\",\"filterGroups\":[{\"rgOptions\":[],\"bAcceptUnion\":true},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false}],\"setSuggestions\":{}}"
+        }
+      },
+      {
+        "name": "toggle off again",
+        "problems": [],
+        "snapshot": {
+          "visible": false,
+          "found": false,
+          "dom": {
+            "sidebarFound": true,
+            "home": {
+              "imgs": 0,
+              "labels": 0
+            },
+            "sidebar": {
+              "imgs": 0,
+              "labels": 0
+            }
+          },
+          "filter": "{\"nFormatVersion\":2,\"strSearchText\":\"<game>\",\"filterGroups\":[{\"rgOptions\":[],\"bAcceptUnion\":true},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false}],\"setSuggestions\":{}}"
+        }
+      },
+      {
+        "name": "untagged",
+        "problems": [],
+        "snapshot": {
+          "visible": true,
+          "found": true,
+          "dom": {
+            "sidebarFound": true,
+            "home": {
+              "imgs": 2,
+              "labels": 1
+            },
+            "sidebar": {
+              "imgs": 1,
+              "labels": 1
+            }
+          },
+          "filter": "{\"nFormatVersion\":2,\"strSearchText\":\"<game>\",\"filterGroups\":[{\"rgOptions\":[],\"bAcceptUnion\":true},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false}],\"setSuggestions\":{}}"
+        }
+      }
+    ],
+    "base": {
+      "visible": true,
+      "found": true,
+      "dom": {
+        "sidebarFound": true,
+        "home": {
+          "imgs": 2,
+          "labels": 1
+        },
+        "sidebar": {
+          "imgs": 1,
+          "labels": 1
+        }
+      },
+      "filter": "{\"nFormatVersion\":2,\"strSearchText\":\"<game>\",\"filterGroups\":[{\"rgOptions\":[],\"bAcceptUnion\":true},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false}],\"setSuggestions\":{}}"
+    }
+  },
+  "filterRestored": true,
   "state": {
     "ready": true,
     "revealed": false,
