@@ -5,6 +5,8 @@ import {
 	type Clock,
 	type LibraryPort,
 	LibraryService,
+	MENU_HOOK_ID,
+	REVEAL_HOOK_ID,
 	VISIBILITY_HOOK_ID,
 } from '../../frontend/services/library';
 import { TagStorage, type TagStorageRpc } from '../../frontend/services/tagStorage';
@@ -113,7 +115,11 @@ class FakePort implements LibraryPort {
 	}
 	manifest: unknown = JSON.stringify({
 		version: 1,
-		expected: [{ id: VISIBILITY_HOOK_ID, description: 'd', runs: 'startup', file: 'f', find: 'x' }],
+		expected: [
+			{ id: VISIBILITY_HOOK_ID, description: 'd', runs: 'startup', file: 'f', find: 'x' },
+			{ id: MENU_HOOK_ID, description: 'd', runs: 'on_demand', file: 'f', find: 'x' },
+			{ id: REVEAL_HOOK_ID, description: 'd', runs: 'on_demand', file: 'f', find: 'x' },
+		],
 		rejected: {},
 	});
 	hookManifest(): Promise<unknown> {
@@ -418,5 +424,84 @@ describe('hook status from the backend manifest', () => {
 		port.seen.add(VISIBILITY_HOOK_ID);
 		clock.advance(1000);
 		expect(lib.getState().seamStatus).toBe('ok');
+	});
+});
+
+describe('UI hooks from the backend manifest', () => {
+	const expected = (...ids: string[]) =>
+		ids.map((id) => ({ id, description: 'd', runs: id === VISIBILITY_HOOK_ID ? 'startup' : 'on_demand', file: 'f', find: 'x' }));
+
+	async function withManifest(manifest: unknown) {
+		const backend = new Backend();
+		backend.tags.add(570);
+		const port = new FakePort();
+		port.manifest = manifest;
+		port.seen.add(VISIBILITY_HOOK_ID);
+		const clock = new FakeClock();
+		const lib = new LibraryService(new TagStorage(backend), port, clock, { pollMs: 1000, graceMs: 10_000 });
+		lib.start();
+		await flush();
+		clock.advance(1000);
+		await flush();
+		return { lib, port };
+	}
+
+	test('all hooks present: tagged games hide and nothing warns', async () => {
+		const { lib } = await withManifest({ version: 1, expected: expected(VISIBILITY_HOOK_ID, MENU_HOOK_ID, REVEAL_HOOK_ID), rejected: [] });
+		expect(lib.shouldHide(570)).toBe(true);
+		expect(lib.getState().seamStatus).toBe('ok');
+		expect(lib.getState().warning).toBeNull();
+		lib.stop();
+	});
+
+	test('a rejected reveal toggle fails open and warns', async () => {
+		const { lib, port } = await withManifest({
+			version: 1,
+			expected: expected(VISIBILITY_HOOK_ID, MENU_HOOK_ID),
+			rejected: [{ id: REVEAL_HOOK_ID, reason: 'bad regex' }],
+		});
+		expect(lib.shouldHide(570)).toBe(false);
+		expect(lib.getState().seamStatus).toBe('warning');
+		expect(lib.getState().warning).toContain('toggle hook is off (rejected (bad regex))');
+		expect(port.events).toContain('bump');
+		lib.stop();
+	});
+
+	test('a reveal toggle missing from the hook list fails open and warns', async () => {
+		const { lib } = await withManifest({ version: 1, expected: expected(VISIBILITY_HOOK_ID, MENU_HOOK_ID), rejected: [] });
+		expect(lib.shouldHide(570)).toBe(false);
+		expect(lib.getState().warning).toContain('not in the plugin');
+		lib.stop();
+	});
+
+	test('a rejected menu hook warns but keeps hiding', async () => {
+		const { lib } = await withManifest({
+			version: 1,
+			expected: expected(VISIBILITY_HOOK_ID, REVEAL_HOOK_ID),
+			rejected: [{ id: MENU_HOOK_ID, reason: 'bad group' }],
+		});
+		expect(lib.shouldHide(570)).toBe(true);
+		expect(lib.getState().seamStatus).toBe('warning');
+		expect(lib.getState().warning).toContain('right-click menu hook is off (rejected (bad group))');
+		lib.stop();
+	});
+
+	test('a library hook problem takes precedence over UI hook problems', async () => {
+		const { lib } = await withManifest({
+			version: 1,
+			expected: [],
+			rejected: [
+				{ id: VISIBILITY_HOOK_ID, reason: 'x' },
+				{ id: REVEAL_HOOK_ID, reason: 'y' },
+			],
+		});
+		expect(lib.getState().warning).toContain('Library hook was rejected (x)');
+		lib.stop();
+	});
+
+	test('before the manifest is read, UI hooks are not reported', async () => {
+		const { lib } = await withManifest('not json');
+		expect(lib.shouldHide(570)).toBe(true);
+		lib.stop();
 	});
 });

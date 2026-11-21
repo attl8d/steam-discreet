@@ -23,6 +23,10 @@ import type { TagSnapshot, TagStorage } from './tagStorage';
 
 /** Must match the hook id in backend/hook_definitions.lua. */
 export const VISIBILITY_HOOK_ID = 'library-visibility';
+/** The reveal toggle in the Library sidebar. Without it nothing could reveal, so its failure means fail open. */
+export const REVEAL_HOOK_ID = 'reveal-toggle';
+/** The Mark/Unmark as adult item in the game context menu. Its failure only warns. */
+export const MENU_HOOK_ID = 'game-context-menu';
 
 export interface LibraryPort {
 	/** The signed-in account, or null until Steam has logged in. */
@@ -168,6 +172,7 @@ export class LibraryService {
 			// Read first, unconditionally, so every list depends on the signal.
 			this.signal?.read();
 			if (this.revealed) return false;
+			if (this.uiHookProblems().reveal !== null) return false;
 			const id = parseAppId(appId);
 			return id !== null && this.snapshot.tags.has(id);
 		} catch {
@@ -289,6 +294,8 @@ export class LibraryService {
 			return; // keep the fallback
 		}
 		this.manifest = parseManifest(raw);
+		// A broken reveal toggle turns hiding off, so lists must recompute.
+		if (this.uiHookProblems().reveal !== null) this.refreshSteam();
 		this.emit();
 	}
 
@@ -308,8 +315,47 @@ export class LibraryService {
 		return { ready, revealed: this.revealed, seamStatus, warning };
 	}
 
-	/** The library hook's state, from the backend manifest and the marker (services/hookStatus.ts). */
+	/**
+	 * Problems with the UI hooks that are known from the backend manifest alone:
+	 * rejected by the loader, or not in the hook list. Before the real manifest
+	 * has loaded nothing is known, so nothing is reported. An unmatched
+	 * on_demand hook stays "not-seen" and cannot be told apart from "not opened
+	 * yet"; the settings page keeps a reveal switch for that case.
+	 */
+	private uiHookProblems(): { reveal: string | null; menu: string | null } {
+		const manifest = this.manifest;
+		if (manifest === null) return { reveal: null, menu: null };
+		const problem = (id: string): string | null => {
+			const rejected = manifest.rejected.find((r) => r.id === id);
+			if (rejected !== undefined) return `rejected (${rejected.reason || 'invalid definition'})`;
+			if (!manifest.expected.some((h) => h.id === id)) return manifest.error ?? 'not in the plugin\'s hook list';
+			return null;
+		};
+		return { reveal: problem(REVEAL_HOOK_ID), menu: problem(MENU_HOOK_ID) };
+	}
+
+	/** Hook state for the toggle: the library hook first, then the UI hooks. */
 	private seamState(): { seamStatus: SeamStatus; warning: string | null } {
+		const library = this.librarySeamState();
+		if (library.seamStatus === 'warning') return library;
+		const ui = this.uiHookProblems();
+		if (ui.reveal !== null) {
+			return {
+				seamStatus: 'warning',
+				warning: `The show/hide toggle hook is off (${ui.reveal}), so tagged games are visible.`,
+			};
+		}
+		if (ui.menu !== null) {
+			return {
+				seamStatus: 'warning',
+				warning: `The right-click menu hook is off (${ui.menu}), so games cannot be marked from the menu. Your tags are unchanged.`,
+			};
+		}
+		return library;
+	}
+
+	/** The library hook's state, from the backend manifest and the marker (services/hookStatus.ts). */
+	private librarySeamState(): { seamStatus: SeamStatus; warning: string | null } {
 		const manifest = this.manifest ?? FALLBACK_MANIFEST;
 		const seen = this.hookSeen ? new Set([VISIBILITY_HOOK_ID]) : new Set<string>();
 		const graceOver = this.started && this.clock.now() - this.startedAt >= this.graceMs;

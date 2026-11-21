@@ -2,7 +2,8 @@ import { describe, expect, test } from 'bun:test';
 import type { AppId } from '../../frontend/domain/appId';
 import { revealToggleView } from '../../frontend/domain/revealToggle';
 import { decideTagMenu, failureMessage, MARK_LABEL, UNMARK_LABEL } from '../../frontend/domain/tagMenu';
-import { parseSelection } from '../../frontend/integrations/steam/selection';
+import { filterIconClasses } from '../../frontend/integrations/steam/filterIconClasses';
+import { parseSelection, selectionFromMenuApps } from '../../frontend/integrations/steam/selection';
 import { menuActionFor, runMenuAction, type TagLibrary } from '../../frontend/services/tagMenuController';
 
 const ids = (...n: number[]) => n as AppId[];
@@ -166,5 +167,49 @@ describe('revealToggleView', () => {
 		expect(loading.disabled).toBe(true);
 		expect(loading.pressed).toBe(false);
 		expect(loading.warning).not.toBeNull();
+	});
+});
+
+describe('selectionFromMenuApps', () => {
+	const app = (appid: unknown, shortcut: unknown = false) => ({ appid, BIsModOrShortcut: () => shortcut });
+
+	test('reads App IDs from overviews', () => {
+		expect(selectionFromMenuApps([app(570), app(730), app(570)])).toEqual(ids(570, 730));
+	});
+
+	test('a shortcut or mod makes the selection unknown', () => {
+		expect(selectionFromMenuApps([app(570), app(2147483649, true)])).toBeNull();
+	});
+
+	test.each([
+		['not an array', { length: 1 }],
+		['empty', []],
+		['undefined overview from a stale multi-select', [app(570), undefined]],
+		['missing BIsModOrShortcut', [{ appid: 570 }]],
+		['non-boolean shortcut answer', [app(570, 'no')]],
+		['bad appid', [app('x')]],
+	])('%s gives null', (_, value) => {
+		expect(selectionFromMenuApps(value)).toBeNull();
+	});
+
+	test('a throwing overview method propagates, for tagMenuItem to catch', () => {
+		expect(() =>
+			selectionFromMenuApps([
+				{
+					appid: 570,
+					BIsModOrShortcut: () => {
+						throw new Error('boom');
+					},
+				},
+			]),
+		).toThrow('boom');
+	});
+});
+
+describe('filterIconClasses', () => {
+	test('keeps strings, drops anything else', () => {
+		expect(filterIconClasses({ button: 'a', active: 'b', disabled: 'c' })).toEqual({ button: 'a', active: 'b', disabled: 'c' });
+		expect(filterIconClasses({ button: 1, active: null })).toEqual({ button: '', active: '', disabled: '' });
+		expect(filterIconClasses(undefined)).toEqual({ button: '', active: '', disabled: '' });
 	});
 });

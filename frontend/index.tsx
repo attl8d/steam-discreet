@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
-import { definePlugin, Field } from 'millennium';
+import { definePlugin } from 'millennium';
 import { Icon } from './components/Icon';
+import { SettingsContent } from './components/Settings';
 import { steamLibraryPort } from './integrations/steam';
 import { tagMenuItem } from './integrations/steam/contextMenu';
 import { revealToggleSlot } from './integrations/steam/revealToggleSlot';
@@ -48,8 +49,6 @@ export const sdTagMenuItem = (rgApps: unknown): ReactNode => tagMenuItem(rgApps)
  * with Steam's filter-icon class names. Returns the reveal toggle.
  */
 export const sdRevealToggle = (classes: unknown): ReactNode => revealToggleSlot(classes);
-
-const SettingsContent = () => <Field label="Steam Discreet" description="Settings arrive in M5." />;
 
 export default definePlugin(() => ({
 	title: 'Steam Discreet',

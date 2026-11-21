@@ -181,10 +181,14 @@
 
 		const again = await openMenu();
 		out.steps.push({ step: 'reopened menu while tagged and revealed', menu: again.info, error: again.error ?? null });
-		if (again.info?.label !== 'Unmark as adult') fail('menu did not switch to Unmark');
-		if (again.item) {
+		// Only ever click Unmark here: a reused row showing another game would
+		// offer Mark, and clicking it would tag an unrelated game.
+		if (again.info?.label === 'Unmark as adult' && again.item) {
 			again.item.click();
 			await sleep(800);
+		} else {
+			fail('menu did not switch to Unmark; not clicking');
+			await closeMenu(again.item);
 		}
 		out.steps.push({ step: 'clicked Unmark', tagged: lib.isTagged(appid) });
 		if (lib.isTagged(appid)) fail('Unmark did not untag the game');

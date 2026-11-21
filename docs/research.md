@@ -434,8 +434,8 @@ Read on 21 November 2026 from Valve's public `steamui_websrc_all.zip` for build 
 - Callers seen in sp.js: the sidebar game row (`includeMultiSelect:!0`, `strCollectionId`), grid and shelf tiles (`hasCustomArtwork`, `onChangeArtwork`), the game page gear button (`omitPrimaryAction:!0`), Downloads (`additionalActions`), major-update event cards, and a dev gallery entry. One hook covers them all.
 - Steam's own "Mark as Private" item (`Ie`, `MarkAsPrivate`/`UnmarkAsPrivate`) disables itself when any target `BIsModOrShortcut()`. Steam Discreet does the same: a shortcut or mod in the selection disables the item (shortcuts are out of scope for v1).
 - The hook inserts `(marker, PLUGIN_LIST['steam-discreet']?.sdTagMenuItem?.(Gt) ?? null)` right after `additionalActions`. `sdTagMenuItem` validates `Gt` in `frontend/integrations/steam/contextMenu.tsx` and never throws.
-- Menu items are Steam's `U.kt` (props `onSelected`, `disabled`). The Millennium SDK's `MenuItem` is expected to be the same component; not yet confirmed live.
-- On the Mac, `g_PopupManager` already held six `contextmenu_*_uid0` popups, so the menu probably renders in a popup window there; on Windows M1 saw it inline in the main window. The check script searches every popup's document.
+- Menu items are Steam's `U.kt` (props `onSelected`, `disabled`). The SDK's `MenuItem` rendered with Steam's `contextMenuItem` class live, and a click fired `onSelected` (below).
+- `g_PopupManager` held six idle `contextmenu_*_uid0` popups on the Mac, but the game menu still rendered inline in the main window, as M1 saw on Windows. The check script searches every popup's document anyway.
 
 ### Reveal toggle (hook `reveal-toggle`)
 
@@ -443,10 +443,25 @@ Read on 21 November 2026 from Valve's public `steamui_websrc_all.zip` for build 
 - The Mac probe found the `ViewName` span ("GAMES") inside `MenuHeader > SearchBar > Bar` at rect [15,135,299,19], with `Pl` four fibers up. This matches the source.
 - The hook inserts the toggle as the first child of `Filters` and passes Steam's own class values for `CheckboxWithImage`, `Active` and `Disabled`, read from the CSS module at render time (keys only, never hashed values), so it looks like the neighbouring icons.
 - `runs = "on_demand"`: the header renders only when the Library is shown, which is not guaranteed at every start.
+- Steam's CSS fills `.Filters .CheckboxWithImage svg` (grey, blue when Active), which overrides `fill` on the `<svg>` element, so the eye sets `fill="none"` on its shapes.
+- Failure handling (`services/library.ts`): if the backend manifest shows `reveal-toggle` rejected or absent, nothing could reveal, so hiding is off (fail open) with a warning. A rejected or absent `game-context-menu` only warns. An unmatched on_demand hook stays `not-seen` (it cannot be told from "not opened yet"), so the settings page has its own "Show adult games" switch as the way out.
 
 ### Live check
 
-`scripts/live/m4-menu-check.js` reads the markers, finds the toggle and opens the menu on a game row; with `SD_CHECK_CLICK = true` it also clicks Mark, the toggle, Unmark and the toggle again. Results pending.
+`scripts/live/m4-menu-check.js` reads the markers, finds the toggle and opens the menu on a game row; with `SD_CHECK_CLICK = true` it also clicks Mark, the toggle, Unmark and the toggle again.
+
+First run, 21 November 2026, Mac client (macOS arm64), build 1794536281, plugin at d185668 (outputs on branch `live-out/m4-probe`, 100a551):
+
+| Check | Result |
+| --- | --- |
+| Markers after start | `library-visibility` 1, `reveal-toggle` 1; `game-context-menu` 1 after the first right-click (on_demand, as expected) |
+| Toggle | In `Filters` with 3 Steam icons (4 children), classes `CheckboxWithImage`, then `CheckboxWithImage Active` when on; label "Show adult games" / "Hide adult games" |
+| Menu | Rendered inline in the main window on the Mac too (the six `contextmenu_*` popups were idle). Items: Play, **Mark as adult**, Remove from Favorites, Add to, Remove from, Manage, separator, Properties... Class `contextMenuItem`, so the SDK's `MenuItem` renders as Steam's own item |
+| Click Mark | Tagged; menu closed |
+| Click toggle | Revealed; game visible again (`BIsVisible` true) |
+| Reopen menu, click Unmark | Not reached: the script right-clicked a sidebar row element that Steam had replaced while the game was hidden (script bug, fixed: rows are found again before each right-click) |
+| Cleanup | Untagged, toggle off, game visible |
+| Closing the menu | A synthetic Escape on the document did not close it (script bug, fixed: Escape on the menu, then a click outside, then the menu's `Hide()`) |
 
 ## macOS (live, 21 November 2026)
 
