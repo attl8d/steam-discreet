@@ -55,11 +55,11 @@ guide_spotlight() {
     valve_in_spotlight || return 0
     cat <<MSG
 
-One manual step if you start Steam from Spotlight (Cmd-Space):
-Spotlight still lists Valve's Steam.app and will keep opening plain Steam.
-Opening Spotlight settings and showing Steam.app in Finder now: under
-Search Privacy, click + (or drag Steam.app from Finder into the list).
-Remove it from the list later to undo. Check with: $0 --status
+If you start Steam from Spotlight (Cmd-Space): two apps are called Steam.
+Type "steam" and pick the one with the Millennium icon a few times;
+Spotlight learns your choice and puts it first. Optionally also hide
+Valve's from file search: Spotlight settings and Finder are opening now;
+under Search Privacy, click + and add Steam.app (remove it to undo).
 MSG
     open "x-apple.systempreferences:com.apple.Spotlight-Settings.extension" 2>/dev/null \
         || open -b com.apple.systempreferences
@@ -103,12 +103,21 @@ build_app() {
     osacompile -o "$app" "$source"
     install -m 0755 "$here/launch.sh" "$app/Contents/Resources/launch.sh"
 
-    # Reuse Steam's own icon so the Dock and Spotlight look the same.
-    local icon
-    icon="$(defaults read "$valve_app/Contents/Info" CFBundleIconFile 2>/dev/null || true)"
-    icon="${icon%.icns}"
-    if [ -n "$icon" ] && [ -f "$valve_app/Contents/Resources/$icon.icns" ]; then
-        cp "$valve_app/Contents/Resources/$icon.icns" "$app/Contents/Resources/applet.icns"
+    # "Steam" gets Millennium's icon so it is easy to tell apart from Valve's
+    # app in Spotlight; "Steam (plain)" gets Steam's own .icns.
+    local icon="" wrapper
+    for wrapper in "/Applications/Steam Millennium.app" "$HOME/Applications/Steam Millennium.app"; do
+        if [ "$url_scheme" = "yes" ] && [ -f "$wrapper/Contents/Resources/AppIcon.icns" ]; then
+            icon="$wrapper/Contents/Resources/AppIcon.icns"
+            break
+        fi
+    done
+    if [ -z "$icon" ]; then
+        icon="$(defaults read "$valve_app/Contents/Info" CFBundleIconFile 2>/dev/null || true)"
+        icon="$valve_app/Contents/Resources/${icon%.icns}.icns"
+    fi
+    if [ -f "$icon" ]; then
+        cp "$icon" "$app/Contents/Resources/applet.icns"
         # An asset-catalog icon would take precedence over applet.icns.
         /usr/libexec/PlistBuddy -c "Delete :CFBundleIconName" "$plist" 2>/dev/null || true
         rm -f "$app/Contents/Resources/Assets.car"
