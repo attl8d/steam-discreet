@@ -79,7 +79,10 @@ describe("tagstore.paths", function()
         paths = require("tagstore.paths")
     end)
 
-    after_each(function() paths.set_root_override(nil) end)
+    after_each(function()
+        paths.set_root_override(nil)
+        paths.set_os_override(nil)
+    end)
 
     it("accepts only SteamID64-shaped account IDs", function()
         assert.are.equal(ACCOUNT, paths.validate_account(ACCOUNT))
@@ -87,6 +90,65 @@ describe("tagstore.paths", function()
         for _, bad in ipairs(bad_ids) do
             assert.is_nil(paths.validate_account(bad))
         end
+    end)
+
+    describe("default root", function()
+        local real_getenv = os.getenv
+        local env
+
+        before_each(function()
+            env = {}
+            -- luacheck: ignore 122
+            os.getenv = function(name) return env[name] end
+        end)
+        after_each(function()
+            -- luacheck: ignore 122
+            os.getenv = real_getenv
+        end)
+
+        it("uses %APPDATA% on Windows", function()
+            paths.set_os_override("Windows")
+            env.APPDATA = "C:\\Users\\u\\AppData\\Roaming"
+            env.HOME = "C:\\Users\\u"
+            local root, source = paths.root()
+            assert.are.equal("C:\\Users\\u\\AppData\\Roaming/SteamDiscreet", root)
+            assert.are.equal("APPDATA", source)
+        end)
+
+        it("uses ~/Library/Application Support on macOS", function()
+            paths.set_os_override("OSX")
+            env.HOME = "/Users/u"
+            env.XDG_DATA_HOME = "/Users/u/.xdg"
+            local root, source = paths.root()
+            assert.are.equal("/Users/u/Library/Application Support/SteamDiscreet", root)
+            assert.are.equal("macOS", source)
+        end)
+
+        it("lets STEAM_DISCREET_DATA_DIR win on macOS", function()
+            paths.set_os_override("OSX")
+            env.HOME = "/Users/u"
+            env.STEAM_DISCREET_DATA_DIR = "/tmp/sd"
+            assert.are.equal("/tmp/sd", (paths.root()))
+        end)
+
+        it("detects macOS from jit.os without an override", function()
+            local real_jit = rawget(_G, "jit")
+            -- luacheck: ignore 122
+            _G.jit = { os = "OSX" }
+            env.HOME = "/Users/u"
+            local root, source = paths.root()
+            _G.jit = real_jit
+            assert.are.equal("/Users/u/Library/Application Support/SteamDiscreet", root)
+            assert.are.equal("macOS", source)
+        end)
+
+        it("uses XDG, then ~/.local/share, elsewhere", function()
+            paths.set_os_override("Linux")
+            env.HOME = "/home/u"
+            assert.are.equal("/home/u/.local/share/SteamDiscreet", (paths.root()))
+            env.XDG_DATA_HOME = "/home/u/.xdg"
+            assert.are.equal("/home/u/.xdg/SteamDiscreet", (paths.root()))
+        end)
     end)
 
     it("routes every path through root()", function()

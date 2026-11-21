@@ -2,6 +2,7 @@
   "scripts": {
     "dev": "starlight watch",
     "build": "starlight pack",
+    "build:mac": "starlight pack --of \"$HOME/Library/Application Support/Millennium/plugins\"",
     "prepare": "starlight lsp",
     "typecheck": "tsc -p frontend && tsc -p webview && tsc -p tests && tsc -p scripts",
     "lint": "eslint .",

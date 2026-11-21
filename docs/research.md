@@ -422,3 +422,39 @@ bun scripts/cdp.ts eval @scripts/live/m3-cycle.js
 ```
 
 The script tags the game through the plugin (`PLUGIN_LIST['steam-discreet'].sdLibrary`), and after each of: tagged, revealed, hidden again, untagged, it checks `BIsVisible`, membership and visible counts of All, Installed, Favorites and the game's user collections, that native Hidden and Favorites are unchanged, and that the filter state is unchanged. It untags the game at the end even if a step fails. Also to check by eye, with the game tagged and then revealed: the sidebar row and the counts in the sidebar collection headers, the collection tiles and their counts in the Collections view (a count-only surface, see above), exact-name Library search, and Home shelves.
+
+## macOS (live, 21 November 2026)
+
+MacBook with Apple Silicon (arm64), macOS 27.2.1. Steam client build **1794536281**, the same build as the Windows findings above, and `sp.js?contenthash=ecfb6699297d77d920fd` is byte-for-byte the same bundle, so the `library-visibility` find pattern matches unchanged.
+
+### Millennium on macOS
+
+- There is no official macOS build. Built from PR [SteamClientHomebrew/Millennium#841](https://github.com/SteamClientHomebrew/Millennium/pull/841) (head `35418d28`, reports itself as v3.5.0-beta.3) with Homebrew LLVM (`brew install llvm ninja cmake`, plus Rust and Bun): `CC=$(brew --prefix llvm)/bin/clang CXX=$(brew --prefix llvm)/bin/clang++ cmake --preset=osx-release -DMILLENNIUM_RUN_TESTS_ON_BUILD=OFF && cmake --build build/osx-release`.
+- Installed with `scripts/macos/install_macos.sh --runtime-build-dir build/osx-release --wrapper-build-dir build/osx-release` (wrapper-app mode). It installs the runtime under `~/Library/Application Support/Millennium/runtime/<version>` and a launcher, `/Applications/Steam Millennium.app`. Steam's own files are not modified (checksums of `steam_osx` and `libtier0_s.dylib` unchanged). Launch through the wrapper; plain Steam.app still starts Steam without Millennium. `--uninstall` removes it.
+- Plugins folder: `~/Library/Application Support/Millennium/plugins`. Config: `~/Library/Application Support/Millennium/config.json`. Millennium logs go to the launcher's stdout/stderr only; `scripts/restart-steam-mac.sh <logfile>` captures them.
+- CDP: the launcher started with `-dev` passes `-devtools-port 8080` to Steam and manages `.cef-enable-remote-debugging` itself. `scripts/cdp.ts` works unchanged.
+
+### Plugin JS patches do not apply with PR 841 alone
+
+With PR 841 the plugin loads (backend, frontend, RPC), but no plugin patch is applied to Steam's JavaScript: no `__steamDiscreetHooks` marker, `BIsVisible` unchanged, and the self-check correctly reports "The Library hook did not attach" after the 60 s grace period (fail open, tag list untouched). Three gaps in Millennium, all macOS only:
+
+1. `libmillennium_hhx64` never hooks `cef_browser_host_create_browser` on macOS (the hook is installed only under `_WIN32`/`__linux__` in `src/instrumentation/loopback/hook.c`), so Steam's own `steamloopback.host` handler keeps serving the files unpatched. libsnare's arm64 path cannot be used as is: it allocates its trampoline on the heap and makes it RWX, which Apple Silicon refuses (`snare_inline_new failed`).
+2. The browser Helper never receives the patch list: on Windows and Linux the host passes `--millennium-loopback-ipc-{handles,fds}` and pipes; the macOS pipe bootstrap (`src/bootstrap/macos/pipe_bootstrap.h`) only passes the CDP pipes.
+3. `src/instrumentation/loopback/src/url.rs` looks for `steamui` under `~/Library/Application Support/Steam`; on macOS it is under `Steam.AppBundle/Steam/Contents/MacOS/steamui`.
+
+A local fix for all three (`tools/millennium-macos/0001-*.patch`, to apply on top of PR 841; not published upstream): an arm64 inline hook with a `MAP_JIT` trampoline and a `VM_PROT_COPY` patch of the 16-byte prologue (Steam Helper has no hardened runtime; the prologue is checked to be position independent), loopback IPC pipes on fds 5 and 6 handed over with the CDP pipes, and the corrected `steamui` path. With it the patch engine logs `sp.js: 'steam-discreet': matched [11982324, 11982642), 1 transform(s), +133 B`. Millennium's C++ and Rust tests pass; `millennium_macos_connector_tests` has the same one failure (`MillenniumAcceptPipeBroker` in "failed handoff preserves the current Helper connection") with and without the fix.
+
+Also in `tools/millennium-macos` (`0002`): upstream commit `2c15d5ba` ("Fix Millennium sidebar menu crashing on latest beta"), cherry-picked. PR 841 predates it, and without it Millennium's own sidebar panel shows "An error occurred while rendering this content" (`TypeError: Cannot read properties of undefined (reading 'Title')`, from `quickAccessMenuClasses`) on every start. It is not related to this plugin.
+
+### Live result with the fix
+
+`scripts/live/m3-cycle.js` on App ID 813780 (a Favorite, in one user collection, not installed): all four steps pass. Tagged with the toggle off, it leaves All (202 to 201), Favorites (18 to 17) and its user collection (8 to 7) immediately, without a reload; it returns when revealed and again when untagged. Native Hidden, Favorites and filter state unchanged. Self-check `ok`.
+
+Tag storage on the live client: the backend runs under LuaJIT (`jit.os == "OSX"`), so the tag file now lives in `~/Library/Application Support/SteamDiscreet/tags-<SteamID64>.txt` (`backend/tagstore/paths.lua`); writes, `.bak` rotation and untag worked. Before this change the Mac fell back to `~/.local/share/SteamDiscreet` (`XDG_DATA_HOME` is unset). Only the live test above wrote there, its list was empty after the final untag, and that folder was removed; no tags exist at the old path, so no migration is needed.
+
+Not checked on the Mac yet: the sidebar and Home shelves by eye, the context-menu item and toggle control, the self-updater.
+
+### Tooling
+
+- `@steambrew/starlight` 1.1.7 ships Windows and Linux binaries only. Built from the Millennium repo at `58528aa8` ("release starlight v1.1.7"), `starlight/`, `cargo build --release`, and copied to `node_modules/@steambrew/starlight/binaries/starlight-darwin-arm64`.
+- Starlight's `"auto"` output path is not implemented on macOS; `bun run build:mac` passes `--of` instead. `--of` takes a folder and appends `<id>.star`.
