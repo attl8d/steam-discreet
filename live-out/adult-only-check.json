@@ -1,130 +1,142 @@
 {
-  "exceptionId": 4,
-  "text": "Uncaught (in promise) TypeError: Cannot read properties of undefined (reading 'values')",
-  "lineNumber": 220,
-  "columnNumber": 42399,
-  "scriptId": "15",
-  "stackTrace": {
-    "callFrames": [
-      {
-        "functionName": "get userCollections",
-        "scriptId": "15",
-        "url": "https://steamloopback.host/sp.js?contenthash=ecfb6699297d77d920fd",
-        "lineNumber": 219,
-        "columnNumber": 42398
-      },
-      {
-        "functionName": "un",
-        "scriptId": "7",
-        "url": "https://steamloopback.host/libraries/libraries~00299a408.js",
-        "lineNumber": 15,
-        "columnNumber": 13305
-      },
-      {
-        "functionName": "",
-        "scriptId": "7",
-        "url": "https://steamloopback.host/libraries/libraries~00299a408.js",
-        "lineNumber": 15,
-        "columnNumber": 10522
-      },
-      {
-        "functionName": "",
-        "scriptId": "7",
-        "url": "https://steamloopback.host/libraries/libraries~00299a408.js",
-        "lineNumber": 15,
-        "columnNumber": 10367
-      },
-      {
-        "functionName": "",
-        "scriptId": "7",
-        "url": "https://steamloopback.host/libraries/libraries~00299a408.js",
-        "lineNumber": 15,
-        "columnNumber": 9977
-      },
-      {
-        "functionName": "",
-        "scriptId": "7",
-        "url": "https://steamloopback.host/libraries/libraries~00299a408.js",
-        "lineNumber": 30,
-        "columnNumber": 29068
-      },
-      {
-        "functionName": "get",
-        "scriptId": "7",
-        "url": "https://steamloopback.host/libraries/libraries~00299a408.js",
-        "lineNumber": 30,
-        "columnNumber": 33959
-      },
-      {
-        "functionName": "get",
-        "scriptId": "37",
-        "url": "https://millennium.ftp/star/steam-discreet/bundle.js",
-        "lineNumber": 2038,
-        "columnNumber": 13
-      },
-      {
-        "functionName": "clearCollectionCounts",
-        "scriptId": "37",
-        "url": "https://millennium.ftp/star/steam-discreet/bundle.js",
-        "lineNumber": 2072,
-        "columnNumber": 26
-      },
-      {
-        "functionName": "clearCounts",
-        "scriptId": "37",
-        "url": "https://millennium.ftp/star/steam-discreet/bundle.js",
-        "lineNumber": 2157,
-        "columnNumber": 22
-      },
-      {
-        "functionName": "",
-        "scriptId": "37",
-        "url": "https://millennium.ftp/star/steam-discreet/bundle.js",
-        "lineNumber": 817,
-        "columnNumber": 28
-      },
-      {
-        "functionName": "safely$1",
-        "scriptId": "37",
-        "url": "https://millennium.ftp/star/steam-discreet/bundle.js",
-        "lineNumber": 927,
-        "columnNumber": 10
-      },
-      {
-        "functionName": "refreshSteam",
-        "scriptId": "37",
-        "url": "https://millennium.ftp/star/steam-discreet/bundle.js",
-        "lineNumber": 817,
-        "columnNumber": 3
-      },
-      {
-        "functionName": "",
-        "scriptId": "37",
-        "url": "https://millennium.ftp/star/steam-discreet/bundle.js",
-        "lineNumber": 661,
-        "columnNumber": 22
-      },
-      {
-        "functionName": "publish",
-        "scriptId": "37",
-        "url": "https://millennium.ftp/star/steam-discreet/bundle.js",
-        "lineNumber": 2783,
-        "columnNumber": 42
-      },
-      {
-        "functionName": "handle",
-        "scriptId": "37",
-        "url": "https://millennium.ftp/star/steam-discreet/bundle.js",
-        "lineNumber": 2760,
-        "columnNumber": 71
+  "appid": 1062090,
+  "build": "1794536281",
+  "steps": [
+    {
+      "name": "adult only",
+      "snapshot": {
+        "mode": "only",
+        "isVisible": true,
+        "isHidden": false,
+        "isFavorite": true,
+        "hiddenSize": 10,
+        "allVisible": 99,
+        "shown": 99,
+        "untaggedShown": 0,
+        "inGroups": [
+          {
+            "id": "favorite",
+            "listed": true
+          },
+          {
+            "id": "uc-xJwr1zvKrwiS",
+            "listed": true
+          }
+        ],
+        "inRecentGroup": "Recent",
+        "staleCounts": [],
+        "sortedByRecent": false,
+        "groupedByCollection": true,
+        "filter": "{\"nFormatVersion\":2,\"strSearchText\":\"\",\"filterGroups\":[{\"rgOptions\":[1],\"bAcceptUnion\":true},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false}],\"setSuggestions\":{}}",
+        "icon": {
+          "label": "Show all games except adult games",
+          "pressed": "true",
+          "disabled": "false",
+          "afterEye": true,
+          "siblings": 5
+        }
       }
-    ]
+    },
+    {
+      "name": "back to hidden",
+      "snapshot": {
+        "mode": "hidden",
+        "isVisible": false,
+        "isHidden": false,
+        "isFavorite": true,
+        "hiddenSize": 10,
+        "allVisible": 103,
+        "shown": 234,
+        "untaggedShown": 234,
+        "inGroups": [
+          {
+            "id": "favorite",
+            "listed": false
+          },
+          {
+            "id": "uc-xJwr1zvKrwiS",
+            "listed": false
+          }
+        ],
+        "inRecentGroup": null,
+        "staleCounts": [],
+        "sortedByRecent": false,
+        "groupedByCollection": true,
+        "filter": "{\"nFormatVersion\":2,\"strSearchText\":\"\",\"filterGroups\":[{\"rgOptions\":[1],\"bAcceptUnion\":true},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false}],\"setSuggestions\":{}}",
+        "icon": {
+          "label": "Show only adult games",
+          "pressed": "false",
+          "disabled": "false",
+          "afterEye": true,
+          "siblings": 5
+        }
+      }
+    }
+  ],
+  "ok": true,
+  "base": {
+    "mode": "hidden",
+    "isVisible": true,
+    "isHidden": false,
+    "isFavorite": true,
+    "hiddenSize": 10,
+    "allVisible": 104,
+    "shown": 235,
+    "untaggedShown": 235,
+    "inGroups": [
+      {
+        "id": "favorite",
+        "listed": true
+      },
+      {
+        "id": "uc-xJwr1zvKrwiS",
+        "listed": true
+      }
+    ],
+    "inRecentGroup": "Recent",
+    "staleCounts": [],
+    "sortedByRecent": false,
+    "groupedByCollection": true,
+    "filter": "{\"nFormatVersion\":2,\"strSearchText\":\"\",\"filterGroups\":[{\"rgOptions\":[1],\"bAcceptUnion\":true},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false}],\"setSuggestions\":{}}",
+    "icon": {
+      "label": "Show only adult games",
+      "pressed": "false",
+      "disabled": "false",
+      "afterEye": true,
+      "siblings": 5
+    }
   },
-  "exception": {
-    "type": "object",
-    "subtype": "error",
-    "className": "TypeError",
-    "description": "TypeError: Cannot read properties of undefined (reading 'values')\n    at get userCollections (https://steamloopback.host/sp.js?contenthash=ecfb6699297d77d920fd:220:42399)\n    at un (https://steamloopback.host/libraries/libraries~00299a408.js:16:13306)\n    at g.computeValue_ (https://steamloopback.host/libraries/libraries~00299a408.js:16:10523)\n    at g.trackAndCompute (https://steamloopback.host/libraries/libraries~00299a408.js:16:10368)\n    at g.get (https://steamloopback.host/libraries/libraries~00299a408.js:16:9978)\n    at g.getObservablePropValue_ (https://steamloopback.host/libraries/libraries~00299a408.js:31:29069)\n    at X.get (https://steamloopback.host/libraries/libraries~00299a408.js:31:33960)\n    at get (https://millennium.ftp/star/steam-discreet/bundle.js:2039:14)\n    at clearCollectionCounts (https://millennium.ftp/star/steam-discreet/bundle.js:2073:27)\n    at Object.clearCounts (https://millennium.ftp/star/steam-discreet/bundle.js:2158:23)",
-    "objectId": "-6407054902604605574.2.1"
+  "otherAppid": 1336490,
+  "end": {
+    "mode": "hidden",
+    "isVisible": true,
+    "isHidden": false,
+    "isFavorite": true,
+    "hiddenSize": 10,
+    "allVisible": 104,
+    "shown": 235,
+    "untaggedShown": 235,
+    "inGroups": [
+      {
+        "id": "favorite",
+        "listed": true
+      },
+      {
+        "id": "uc-xJwr1zvKrwiS",
+        "listed": true
+      }
+    ],
+    "inRecentGroup": "Recent",
+    "staleCounts": [],
+    "sortedByRecent": false,
+    "groupedByCollection": true,
+    "filter": "{\"nFormatVersion\":2,\"strSearchText\":\"\",\"filterGroups\":[{\"rgOptions\":[1],\"bAcceptUnion\":true},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false}],\"setSuggestions\":{}}",
+    "icon": {
+      "label": "Show only adult games",
+      "pressed": "false",
+      "disabled": "false",
+      "afterEye": true,
+      "siblings": 5
+    }
   }
 }
