@@ -1,5 +1,14 @@
 import type { AccountId } from '../domain/accountId';
 import type { AppId } from '../domain/appId';
+import {
+	type BackupList,
+	type Failure,
+	type ImportPreview,
+	parseListReply,
+	parsePreview,
+	parseReadReply,
+	parseSaveReply,
+} from './backupFiles';
 import { tagRows, type TagRow } from '../domain/tagList';
 import {
 	type Environment,
@@ -27,8 +36,14 @@ export interface SettingsBackend {
 	environment(): Promise<unknown>;
 	/** Removes the real folder and login names (backend/redact.lua). */
 	redact(text: string): Promise<unknown>;
-	/** Parses import text without saving (`tags_preview_import`). */
-	previewImport(text: string): Promise<unknown>;
+	/** Parses import text without saving (`tags_preview_import`); `account` may be "". */
+	previewImport(text: string, account: string): Promise<unknown>;
+	/** Writes a backup file of the account's tags (`backup_save`). */
+	saveBackup(account: string): Promise<unknown>;
+	/** Backup files found, newest first (`backup_list`). */
+	listBackups(account: string): Promise<unknown>;
+	/** One listed backup's text (`backup_read`). Changes nothing. */
+	readBackup(id: string): Promise<unknown>;
 }
 
 /** Read-only facts from the Steam client (frontend/integrations/steam/clientInfo.ts). */
@@ -60,7 +75,10 @@ export function millenniumSettingsBackend(): SettingsBackend {
 		rollback: () => backend.steam_discreet_update_rollback(),
 		environment: () => backend.steam_discreet_environment(),
 		redact: (text) => backend.steam_discreet_redact(text),
-		previewImport: (text) => backend.tags_preview_import(text),
+		previewImport: (text, account) => backend.tags_preview_import(text, account),
+		saveBackup: (account) => backend.backup_save(account),
+		listBackups: (account) => backend.backup_list(account),
+		readBackup: (id) => backend.backup_read(id),
 	};
 }
 
@@ -139,20 +157,63 @@ export class SettingsService {
 		return result.ok ? result : { ok: false, message: `Export failed: ${result.message}` };
 	}
 
-	/** How many App IDs pasted text holds, without saving anything. */
-	async previewImport(text: string): Promise<{ readonly ok: true; readonly count: number } | { readonly ok: false; readonly message: string }> {
+	/**
+	 * How many App IDs pasted text holds, without saving anything. For a backup
+	 * file also when it was saved and whether it comes from this Steam account.
+	 */
+	async previewImport(text: string): Promise<ImportPreview | Failure> {
 		if (text.trim() === '') return { ok: false, message: 'Paste an exported tag list first.' };
 		try {
-			const raw: unknown = await this.backend.previewImport(text);
-			if (typeof raw === 'object' && raw !== null) {
-				const r = raw as Record<string, unknown>;
-				if (r.ok === true && typeof r.count === 'number') return { ok: true, count: r.count };
-				if (typeof r.message === 'string' && r.message !== '') return { ok: false, message: r.message };
-			}
-			return { ok: false, message: 'Unexpected reply from tag storage' };
+			return parsePreview(await this.backend.previewImport(text, this.storage.snapshot.account ?? ''));
 		} catch (error) {
 			return { ok: false, message: describe(error) };
 		}
+	}
+
+	/** Saves a backup file of this account's tag list. */
+	async saveBackup(): Promise<ActionResult> {
+		const account = this.storage.snapshot.account;
+		if (!this.view.library.ready || account === null) return { ok: false, message: 'Tags are not loaded yet.' };
+		let reply;
+		try {
+			reply = parseSaveReply(await this.backend.saveBackup(account));
+		} catch (error) {
+			reply = { ok: false, message: describe(error) } as const;
+		}
+		if (!reply.ok) return { ok: false, message: `No backup was saved: ${reply.message}` };
+		const saved = `Saved a backup of ${games(reply.count)} to ${reply.path}.`;
+		const why =
+			reply.fallbackReason !== null
+				? ` Your Documents folder could not be used (${reply.fallbackReason}), so it went to the plugin's own folder.`
+				: reply.location === 'fallback'
+					? ' No Documents folder was found, so it went to the plugin\'s own folder.'
+					: '';
+		return { ok: true, message: `${saved}${why} It lists your tagged games, so keep it private.` };
+	}
+
+	/** The backup files found, newest first. */
+	async listBackups(): Promise<BackupList | Failure> {
+		try {
+			const reply = parseListReply(await this.backend.listBackups(this.storage.snapshot.account ?? ''));
+			return reply.ok ? reply : { ok: false, message: `Could not look for backups: ${reply.message}` };
+		} catch (error) {
+			return { ok: false, message: `Could not look for backups: ${describe(error)}` };
+		}
+	}
+
+	/**
+	 * Restores a listed backup into this account's tags, through the same path
+	 * as a pasted import: Replace saves the current list first for an Undo.
+	 */
+	async restoreBackup(id: string, mode: ImportMode): Promise<ActionResult> {
+		let read;
+		try {
+			read = parseReadReply(await this.backend.readBackup(id));
+		} catch (error) {
+			read = { ok: false, message: describe(error) } as const;
+		}
+		if (!read.ok) return { ok: false, message: `Nothing was restored: ${read.message}` };
+		return this.importText(read.text, mode);
 	}
 
 	/**
@@ -176,7 +237,6 @@ export class SettingsService {
 		if (!result.ok) return { ok: false, message: `Nothing was imported: ${result.message}` };
 		if (undo !== null) this.setUndo(undo);
 		const after = result.snapshot.tags.size;
-		const games = (n: number) => `${String(n)} game${n === 1 ? '' : 's'}`;
 		const message =
 			mode === 'merge'
 				? `Imported. ${games(after - before)} added; ${games(after)} tagged in total.`
@@ -285,6 +345,10 @@ export class SettingsService {
 			}
 		}
 	}
+}
+
+function games(n: number): string {
+	return `${String(n)} game${n === 1 ? '' : 's'}`;
 }
 
 function describe(error: unknown): string {

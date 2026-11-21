@@ -3,6 +3,15 @@ import { Component, type CSSProperties, type ReactNode, useCallback, useEffect, 
 import type { AppId } from '../domain/appId';
 import { copyText } from '../integrations/steam/clipboard';
 import { canRollBack, type UpdateStatus } from '../services/backendInfo';
+import {
+	type BackupEntry,
+	type BackupList,
+	describeEntry,
+	type ImportPreview,
+	importQuestion,
+	restorable,
+	restoreQuestion,
+} from '../services/backupFiles';
 import type { HookState } from '../services/hookStatus';
 import { getState, setRevealed, subscribe } from '../services/library';
 import { type ActionResult, installedSettings, type SettingsService, type SettingsView } from '../services/settings';
@@ -29,6 +38,8 @@ const HOOK_LABEL: Record<HookState, string> = {
 
 /** Shown at most this many rows at once; the search narrows the rest. */
 const MAX_ROWS = 200;
+/** Backups listed at once, newest first. */
+const MAX_BACKUPS = 10;
 
 const buttonStyle: CSSProperties = { width: 'auto', minWidth: 120, padding: '0 16px', marginLeft: 8 };
 const textAreaStyle: CSSProperties = {
@@ -61,6 +72,9 @@ export function SettingsContent() {
 					</Section>
 					<Section name="Tagged games">
 						<TagsSection settings={settings} />
+					</Section>
+					<Section name="Backup and restore">
+						<BackupSection settings={settings} />
 					</Section>
 					<Section name="Export and import">
 						<TransferSection settings={settings} />
@@ -264,13 +278,150 @@ function games(n: number): string {
 	return `${String(n)} game${n === 1 ? '' : 's'}`;
 }
 
+/** Save a backup file, and restore one of the files found, newest first. */
+function BackupSection({ settings }: { settings: SettingsService }) {
+	const view = useSettingsView(settings);
+	const [list, setList] = useState<BackupList | null>(null);
+	const [chosen, setChosen] = useState<BackupEntry | null>(null);
+	const [result, setResult] = useState<ActionResult | null>(null);
+	const [busy, setBusy] = useState(false);
+	const canEdit = editable(view) && !busy;
+
+	const task = async (work: () => Promise<void>) => {
+		setBusy(true);
+		try {
+			await work();
+		} finally {
+			setBusy(false);
+		}
+	};
+
+	const refresh = async () => {
+		const res = await settings.listBackups();
+		if (res.ok) {
+			setList(res);
+		} else {
+			setList(null);
+			setResult(res);
+		}
+	};
+
+	const save = () =>
+		task(async () => {
+			setChosen(null);
+			setResult(await settings.saveBackup());
+			if (list !== null) await refresh();
+		});
+
+	const find = () =>
+		task(async () => {
+			setChosen(null);
+			setResult(null);
+			await refresh();
+		});
+
+	const restore = (entry: BackupEntry, mode: 'merge' | 'replace') =>
+		task(async () => {
+			setChosen(null);
+			setResult(await settings.restoreBackup(entry.id, mode));
+		});
+
+	const shown = list === null ? [] : list.entries.slice(0, MAX_BACKUPS);
+	return (
+		<>
+			<Field
+				label="Save backup"
+				description="Saves your tag list to a file in your Documents folder, under Steam Discreet. The file lists the App IDs of your tagged games, so keep it private. If your Documents folder syncs to OneDrive or iCloud, the backup is uploaded too. On a Mac, macOS may first ask whether Steam can use your Documents folder."
+			>
+				<DialogButton
+					style={buttonStyle}
+					disabled={!view.library.ready || busy}
+					onClick={() => {
+						void save();
+					}}
+				>
+					Save backup
+				</DialogButton>
+			</Field>
+			<Field label="Restore backup" description="Finds your backup files, newest first. Restoring changes only the tag list of the Steam account you are signed in to.">
+				<DialogButton
+					style={buttonStyle}
+					disabled={busy}
+					onClick={() => {
+						void find();
+					}}
+				>
+					{list === null ? 'Find backups' : 'Refresh'}
+				</DialogButton>
+			</Field>
+			{list !== null && list.entries.length === 0 && (
+				<Field
+					indentLevel={1}
+					description={`No backups found in ${list.folder}. Save one first, or paste a backup into Import below.`}
+				/>
+			)}
+			{shown.map((entry) =>
+				chosen?.id === entry.id && entry.count !== null ? (
+					<Field key={entry.id} label={entry.name} indentLevel={1} description={restoreQuestion({ count: entry.count, sameAccount: entry.sameAccount }, view.tags.tags.size)}>
+						<DialogButton
+							style={buttonStyle}
+							disabled={!canEdit}
+							onClick={() => {
+								void restore(entry, 'replace');
+							}}
+						>
+							Replace
+						</DialogButton>
+						<DialogButton
+							style={buttonStyle}
+							disabled={!canEdit}
+							onClick={() => {
+								void restore(entry, 'merge');
+							}}
+						>
+							Add to my tags
+						</DialogButton>
+						<DialogButton
+							style={buttonStyle}
+							onClick={() => {
+								setChosen(null);
+							}}
+						>
+							Cancel
+						</DialogButton>
+					</Field>
+				) : (
+					<Field key={entry.id} label={entry.name} indentLevel={1} padding="compact" description={describeEntry(entry)}>
+						{restorable(entry) && (
+							<DialogButton
+								style={buttonStyle}
+								disabled={!canEdit}
+								onClick={() => {
+									setResult(null);
+									setChosen(entry);
+								}}
+							>
+								Restore…
+							</DialogButton>
+						)}
+					</Field>
+				),
+			)}
+			{list !== null && list.total > shown.length && (
+				<Field indentLevel={1} description={`${String(list.total - shown.length)} older backups are not shown. They are in ${list.folder}.`} />
+			)}
+			<ResultLine result={result} />
+		</>
+	);
+}
+
 function TransferSection({ settings }: { settings: SettingsService }) {
 	const view = useSettingsView(settings);
 	const ref = useRef<HTMLDivElement>(null);
 	const [exported, setExported] = useState<string | null>(null);
 	const [importText, setImportText] = useState('');
-	/** Set while the Replace confirmation is open: how many App IDs the paste holds. */
-	const [confirmReplace, setConfirmReplace] = useState<number | null>(null);
+	/** Set while a confirmation is open: what the paste holds and what it would do. */
+	const [confirm, setConfirm] = useState<{ readonly mode: 'merge' | 'replace'; readonly preview: ImportPreview } | null>(null);
 	const [result, setResult] = useState<ActionResult | null>(null);
 	const [busy, setBusy] = useState(false);
 	const canEdit = editable(view) && !busy;
@@ -307,19 +458,26 @@ function TransferSection({ settings }: { settings: SettingsService }) {
 		}
 	};
 
-	const askReplace = async () => {
+	/** Replace always asks first; Add asks only for a backup from another account. */
+	const ask = async (mode: 'merge' | 'replace') => {
 		setBusy(true);
+		let preview: ImportPreview | null = null;
 		try {
-			const preview = await settings.previewImport(importText);
-			if (preview.ok) {
-				setResult(null);
-				setConfirmReplace(preview.count);
-			} else {
-				setResult({ ok: false, message: `Nothing was replaced: ${preview.message}` });
+			const res = await settings.previewImport(importText);
+			if (!res.ok) {
+				setResult({ ok: false, message: `Nothing was ${mode === 'merge' ? 'imported' : 'replaced'}: ${res.message}` });
+				return;
 			}
+			preview = res;
 		} finally {
 			setBusy(false);
 		}
+		if (mode === 'merge' && preview.sameAccount !== 'no') {
+			await doImport('merge');
+			return;
+		}
+		setResult(null);
+		setConfirm({ mode, preview });
 	};
 
 	return (
@@ -351,34 +509,35 @@ function TransferSection({ settings }: { settings: SettingsService }) {
 					placeholder="Paste here"
 					onChange={(e) => {
 						setImportText(e.currentTarget.value);
-						setConfirmReplace(null);
+						setConfirm(null);
 					}}
 				/>
 			</Field>
 			<Field
 				indentLevel={1}
 				description={
-					confirmReplace !== null
-						? `Replace your ${games(view.tags.tags.size)} with the ${games(confirmReplace)} pasted? Games not in the paste are untagged. The current list is saved first, and an Undo button puts it back until Steam restarts.`
-						: 'Add keeps your current tags. Replace swaps the whole list.'
+					confirm !== null
+						? importQuestion(confirm.mode, confirm.preview, view.tags.tags.size, 'paste')
+						: 'Add keeps your current tags. Replace swaps the whole list. A backup file can be pasted here too.'
 				}
 			>
-				{confirmReplace !== null ? (
+				{confirm !== null ? (
 					<>
 						<DialogButton
 							style={buttonStyle}
 							disabled={!canEdit}
 							onClick={() => {
-								setConfirmReplace(null);
-								void doImport('replace');
+								const mode = confirm.mode;
+								setConfirm(null);
+								void doImport(mode);
 							}}
 						>
-							Replace
+							{confirm.mode === 'replace' ? 'Replace' : 'Add'}
 						</DialogButton>
 						<DialogButton
 							style={buttonStyle}
 							onClick={() => {
-								setConfirmReplace(null);
+								setConfirm(null);
 							}}
 						>
 							Cancel
@@ -390,7 +549,7 @@ function TransferSection({ settings }: { settings: SettingsService }) {
 							style={buttonStyle}
 							disabled={!canEdit || importText.trim() === ''}
 							onClick={() => {
-								void doImport('merge');
+								void ask('merge');
 							}}
 						>
 							Add to my tags
@@ -399,7 +558,7 @@ function TransferSection({ settings }: { settings: SettingsService }) {
 							style={buttonStyle}
 							disabled={!canEdit || importText.trim() === ''}
 							onClick={() => {
-								void askReplace();
+								void ask('replace');
 							}}
 						>
 							Replace…

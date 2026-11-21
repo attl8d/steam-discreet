@@ -4,6 +4,18 @@ import { tagRows } from '../../frontend/domain/tagList';
 import { readAppName, readSteamBuild } from '../../frontend/integrations/steam/clientInfo';
 import { copyText } from '../../frontend/integrations/steam/clipboard';
 import { canRollBack, compareVersions, parseEnvironment, parseUpdateStatus } from '../../frontend/services/backendInfo';
+import {
+	type BackupEntry,
+	describeEntry,
+	importQuestion,
+	parseListReply,
+	parsePreview,
+	parseReadReply,
+	parseSaved,
+	parseSaveReply,
+	restorable,
+	restoreQuestion,
+} from '../../frontend/services/backupFiles';
 import { clean } from '../../frontend/services/diagnostics';
 
 describe('readSteamBuild', () => {
@@ -152,5 +164,106 @@ describe('clean', () => {
 	test('a storage reason built the way store.lua builds it', () => {
 		const reason = 'Cannot create storage folder (APPDATA): C:\\Users\\Jane Doe\\AppData\\Roaming\\SteamDiscreet: Access is denied';
 		expect(clean(reason)).toBe('Cannot create storage folder (APPDATA): C:\\Users\\<user>\\AppData\\Roaming\\SteamDiscreet: Access is denied');
+	});
+});
+
+describe('backup file replies', () => {
+	test('preview: counts, kind, saved time and account check; anything else is unknown', () => {
+		expect(parsePreview({ ok: true, count: 3, kind: 'backup', saved: '2026-11-21T19:40:00Z', same_account: 'no' })).toEqual({
+			ok: true,
+			count: 3,
+			kind: 'backup',
+			saved: new Date('2026-11-21T19:40:00Z'),
+			sameAccount: 'no',
+		});
+		expect(parsePreview({ ok: true, count: 1, kind: 'weird', saved: 'yesterday', same_account: 'maybe' })).toEqual({
+			ok: true,
+			count: 1,
+			kind: 'list',
+			saved: null,
+			sameAccount: 'unknown',
+		});
+		expect(parsePreview({ ok: true, count: -1 }).ok).toBe(false);
+		expect(parsePreview({ ok: false, message: 'newer' })).toEqual({ ok: false, message: 'newer' });
+		expect(parsePreview('x').ok).toBe(false);
+	});
+
+	test('saved times must be the backend shape', () => {
+		expect(parseSaved('2026-11-21T19:40:00Z')).toEqual(new Date('2026-11-21T19:40:00Z'));
+		for (const v of ['2026-11-21', '2026-13-45T99:99:99Z', 5, null]) expect(parseSaved(v)).toBeNull();
+	});
+
+	test('save reply needs a name, path, count and known location', () => {
+		const good = { ok: true, name: 'a.txt', path: 'p/a.txt', count: 2, kind: 'override' };
+		expect(parseSaveReply(good)).toEqual({ ok: true, name: 'a.txt', path: 'p/a.txt', count: 2, location: 'override', fallbackReason: null });
+		expect(parseSaveReply({ ...good, kind: 'desktop' }).ok).toBe(false);
+		expect(parseSaveReply({ ...good, count: '2' }).ok).toBe(false);
+	});
+
+	test('list reply skips malformed lines and keeps counts only for good backups', () => {
+		const reply = parseListReply({
+			ok: true,
+			folder: 'F',
+			entries: ['1:a.txt\ta.txt\tok\t4\t\tno\tdocuments', 'junk', '1:b.txt\tb.txt\tbogus\t1\t\tyes\tdocuments', '2:c.txt\tc.txt\tnewer\t9\t\tyes\tfallback', ''].join('\n'),
+		});
+		if (!reply.ok) throw new Error(reply.message);
+		expect(reply.entries.map((e) => [e.id, e.status, e.count, e.sameAccount])).toEqual([
+			['1:a.txt', 'ok', 4, 'no'],
+			['2:c.txt', 'newer', null, 'yes'],
+		]);
+		expect(reply.total).toBe(2);
+		expect(parseListReply({ ok: true, folder: 'F', entries: '' })).toEqual({ ok: true, folder: 'F', entries: [], total: 0 });
+		const capped = parseListReply({ ok: true, folder: 'F', entries: '1:a.txt\ta.txt\tok\t4\t\tno\tdocuments', total: 150 });
+		expect(capped.ok && capped.total).toBe(150);
+		expect(parseListReply({ ok: true, entries: {} }).ok).toBe(false);
+	});
+
+	test('read reply carries the text', () => {
+		expect(parseReadReply({ ok: true, text: 'x' })).toEqual({ ok: true, text: 'x' });
+		expect(parseReadReply({ ok: true }).ok).toBe(false);
+	});
+});
+
+describe('backup wording', () => {
+	const entry: BackupEntry = {
+		id: '1:a.txt',
+		name: 'a.txt',
+		status: 'ok',
+		count: 1,
+		saved: new Date('2026-11-21T19:40:00Z'),
+		sameAccount: 'yes',
+		location: 'documents',
+	};
+	const fmt = (d: Date) => d.toISOString().slice(0, 10);
+
+	test('describes each backup', () => {
+		expect(describeEntry(entry, fmt)).toBe('1 game, saved 2026-11-21');
+		expect(describeEntry({ ...entry, count: 3, sameAccount: 'no', location: 'fallback', saved: null }, fmt)).toBe(
+			"3 games, from another Steam account, in the plugin's own folder",
+		);
+		expect(describeEntry({ ...entry, status: 'newer' }, fmt)).toContain('newer version');
+		expect(describeEntry({ ...entry, count: 0 }, fmt)).toBe('Empty, nothing to restore.');
+		expect(restorable(entry)).toBe(true);
+		for (const e of [{ ...entry, count: 0 }, { ...entry, status: 'invalid' as const }, { ...entry, status: 'newer' as const }]) {
+			expect(restorable(e)).toBe(false);
+		}
+		expect(describeEntry({ ...entry, status: 'invalid' }, fmt)).toContain('cannot be restored');
+	});
+
+	test('the restore confirmation explains both Replace and Add', () => {
+		const text = restoreQuestion({ count: 2, sameAccount: 'no' }, 5);
+		expect(text).toStartWith('This backup is from another Steam account. This backup has 2 games; you have 5 games tagged now.');
+		expect(text).toContain('Replace swaps your list');
+		expect(text).toContain('Undo');
+		expect(text).toContain('Add to my tags keeps your current tags');
+	});
+
+	test('the confirmation names both counts, the Undo and another account', () => {
+		expect(importQuestion('replace', { count: 2, sameAccount: 'yes' }, 5, 'backup')).toBe(
+			'Replace your 5 games with the 2 games in this backup? Games not in this backup are untagged. The current list is saved first, and an Undo button puts it back until Steam restarts.',
+		);
+		expect(importQuestion('merge', { count: 1, sameAccount: 'no' }, 0, 'paste')).toBe(
+			'This backup is from another Steam account. Add the 1 game in the paste to your 0 games? Your current tags stay.',
+		);
 	});
 });

@@ -76,4 +76,25 @@ function M.ensure_dir(path)
     return true
 end
 
+function M.is_dir(path)
+    return fs.is_directory(path) == true
+end
+
+--- The regular files directly in `dir`, as { name, size? }, through
+--- Millennium's `fs.list` (an array of entries with `name`, `is_file`, `size`).
+---@return { name: string, size: integer|nil }[]|nil files
+---@return string|nil err
+function M.list_files(dir)
+    local ok, entries, err = pcall(fs.list, dir)
+    if not ok then return nil, tostring(entries) end
+    if type(entries) ~= "table" then return nil, err or "cannot list folder" end
+    local names = {}
+    for _, entry in ipairs(entries) do
+        if type(entry) == "table" and entry.is_file == true and type(entry.name) == "string" then
+            names[#names + 1] = { name = entry.name, size = type(entry.size) == "number" and entry.size or nil }
+        end
+    end
+    return names
+end
+
 return M

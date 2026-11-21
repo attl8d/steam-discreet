@@ -100,15 +100,128 @@ function M.parse(text)
     return { status = "ok", set = set, count = count, version = version }
 end
 
---- Parse text the user chose to import. Accepts an exported tag file, or a bare
---- list of App IDs separated by newlines, commas, semicolons or spaces.
---- Returns { status = "ok", set, count } or { status = "newer" | "invalid", ... }.
+-- Backup file format, version 1. A tag list with a few facts around it, so a
+-- file the user keeps can be checked before it replaces anything:
+--
+--   steam-discreet-backup 1
+--   # comment lines explain the file to whoever opens it
+--   saved 2026-11-21T19:40:00Z
+--   plugin 0.1.0
+--   account 3f2a
+--   tags 2
+--   570
+--   730
+--   end 2
+--
+-- `key value` lines before `tags` are facts. A reader ignores keys it does not
+-- know, so later version 1 writers can add settings without breaking older
+-- readers; anything an older reader must not ignore needs version 2. The
+-- `account` value is a 4-hex-digit hash of the SteamID64, short on purpose so
+-- it cannot be reversed to the account (backend/tagstore/backups.lua). The
+-- reveal toggle is never part of a backup, and a reader never applies a fact
+-- to it: only `saved` and `account` are read.
+
+M.BACKUP_VERSION = 1
+M.BACKUP_MAGIC = "steam-discreet-backup"
+
+local BACKUP_COMMENT = {
+    "# Steam Discreet backup. It lists the App IDs of the games you tagged,",
+    "# so anyone who opens it can see them. Keep it private.",
+    "# Restore it from the Steam Discreet settings page in Steam.",
+}
+
+local function clean_fact(value)
+    return (tostring(value):gsub("[%c]", " "))
+end
+
+---@param set table<integer, boolean>
+---@param facts { saved?: string, plugin?: string, account?: string }
+---@return string
+function M.serialize_backup(set, facts)
+    facts = facts or {}
+    local ids = M.sorted_ids(set)
+    local lines = { M.BACKUP_MAGIC .. " " .. M.BACKUP_VERSION }
+    for i = 1, #BACKUP_COMMENT do lines[#lines + 1] = BACKUP_COMMENT[i] end
+    for _, key in ipairs({ "saved", "plugin", "account" }) do
+        if facts[key] ~= nil and facts[key] ~= "" then lines[#lines + 1] = key .. " " .. clean_fact(facts[key]) end
+    end
+    lines[#lines + 1] = "tags " .. #ids
+    for i = 1, #ids do lines[#lines + 1] = string.format("%d", ids[i]) end
+    lines[#lines + 1] = "end " .. #ids
+    return table.concat(lines, "\n") .. "\n"
+end
+
+--- Parse a backup file.
+--- Returns { status = "ok", set, count, facts = { [key] = value } },
+--- { status = "newer", version } or { status = "invalid", reason }.
+---@param text any
+function M.parse_backup(text)
+    if type(text) ~= "string" then return { status = "invalid", reason = "not text" } end
+    if text:sub(1, 3) == "\239\187\191" then text = text:sub(4) end
+    local lines = split_lines(text)
+    local header = lines[1]
+    if not header then return { status = "invalid", reason = "empty file" } end
+    local magic, version = header:match("^(%S+) (%d+)$")
+    if magic ~= M.BACKUP_MAGIC then return { status = "invalid", reason = "missing header" } end
+    version = tonumber(version)
+    if version > M.BACKUP_VERSION then return { status = "newer", version = version } end
+    if version < 1 then return { status = "invalid", reason = "bad version" } end
+
+    local facts, i, declared = {}, 2, nil
+    while i <= #lines do
+        local line = lines[i]
+        local n = line:match("^tags (%d+)$")
+        if n then
+            declared = tonumber(n)
+            break
+        end
+        if line ~= "" and line:sub(1, 1) ~= "#" then
+            local key, value = line:match("^([%a_][%w_]*) (.*)$")
+            if not key then return { status = "invalid", reason = "bad line " .. i } end
+            facts[key] = value
+        end
+        i = i + 1
+    end
+    if not declared then return { status = "invalid", reason = "no tag list" } end
+
+    local trailer = lines[#lines]
+    local expected = #lines > i and trailer:match("^end (%d+)$")
+    if not expected then return { status = "invalid", reason = "missing end marker (file cut short?)" } end
+    expected = tonumber(expected)
+    local first, last = i + 1, #lines - 1
+    if last - first + 1 ~= expected or expected ~= declared then
+        return { status = "invalid", reason = "count mismatch" }
+    end
+
+    local set, count = {}, 0
+    for j = first, last do
+        local id = M.parse_app_id(lines[j])
+        if not id then return { status = "invalid", reason = "bad line " .. j } end
+        if not set[id] then
+            set[id] = true
+            count = count + 1
+        end
+    end
+    return { status = "ok", set = set, count = count, version = version, facts = facts }
+end
+
+--- Parse text the user chose to import. Accepts a backup file, an exported tag
+--- file, or a bare list of App IDs separated by newlines, commas, semicolons or
+--- spaces. Returns { status = "ok", set, count, kind, facts? } or
+--- { status = "newer" | "invalid", ... }. `kind` is "backup", "tags" or "list".
 ---@param text any
 function M.parse_import(text)
     if type(text) ~= "string" then return { status = "invalid", reason = "not text" } end
     local stripped = text:gsub("^\239\187\191", ""):gsub("^%s+", "")
+    if stripped:sub(1, #M.BACKUP_MAGIC) == M.BACKUP_MAGIC then
+        local parsed = M.parse_backup(stripped)
+        parsed.kind = "backup"
+        return parsed
+    end
     if stripped:sub(1, #M.MAGIC) == M.MAGIC then
-        return M.parse(stripped)
+        local parsed = M.parse(stripped)
+        parsed.kind = "tags"
+        return parsed
     end
     local set, count = {}, 0
     for token in stripped:gmatch("[^%s,;]+") do
@@ -119,7 +232,7 @@ function M.parse_import(text)
             count = count + 1
         end
     end
-    return { status = "ok", set = set, count = count }
+    return { status = "ok", set = set, count = count, kind = "list" }
 end
 
 --- Comma-separated ID list, the wire format to the frontend. A string is used
