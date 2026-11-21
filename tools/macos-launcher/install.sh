@@ -74,7 +74,7 @@ status() {
     if valve_in_spotlight; then
         echo "Spotlight: still lists Valve's Steam.app, so Cmd-Space \"steam\" may open plain Steam (see README)"
     else
-        echo "Spotlight: Valve's Steam.app is hidden"
+        echo "Spotlight: Valve's Steam.app is excluded from file search (app results may still list it)"
     fi
     echo "log: $HOME/Library/Logs/SteamLauncher.log"
 }
