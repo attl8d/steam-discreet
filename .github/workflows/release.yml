@@ -1,0 +1,65 @@
+name: Release
+
+# Push a tag like v0.2.0 to publish. The tag must match `version` in
+# millennium.toml and backend/version.lua. The self-updater (backend/updater.lua)
+# installs only full releases from this repo whose assets are exactly
+# steam-discreet.star and steam-discreet.star.sha256.
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    needs: checks
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      - run: bun install --frozen-lockfile
+
+      - name: Check the tag matches the plugin version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          toml=$(sed -n '/^\[plugin\]/,/^\[/{s/^version *= *"\(.*\)"/\1/p}' millennium.toml)
+          lua=$(sed -n 's/^return "\(.*\)"/\1/p' backend/version.lua)
+          echo "tag=$tag millennium.toml=$toml backend/version.lua=$lua"
+          if [ "$tag" != "$toml" ] || [ "$tag" != "$lua" ]; then
+            echo "::error::Tag v$tag does not match millennium.toml ($toml) and backend/version.lua ($lua)"
+            exit 1
+          fi
+
+      - name: Package plugin
+        run: |
+          mkdir -p dist
+          ./node_modules/.bin/starlight pack --release -o dist --source-commit "$GITHUB_SHA"
+          test -s dist/steam-discreet.star
+          ./node_modules/.bin/starlight inspect dist/steam-discreet.star
+
+      - name: Write checksum
+        working-directory: dist
+        run: |
+          sha256sum steam-discreet.star > steam-discreet.star.sha256
+          cat steam-discreet.star.sha256
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            dist/steam-discreet.star dist/steam-discreet.star.sha256 \
+            --verify-tag --title "$GITHUB_REF_NAME" --generate-notes

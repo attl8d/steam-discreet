@@ -4,5 +4,5 @@
     "baseUrl": "..",
     "types": ["bun"]
   },
-  "include": ["frontend/**/*", "../frontend/**/*", "../.millennium/types/**/*.d.ts"]
+  "include": ["frontend/**/*", "hooks/**/*", "../frontend/**/*", "../.millennium/types/**/*.d.ts"]
 }

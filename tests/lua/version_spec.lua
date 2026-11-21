@@ -1,0 +1,11 @@
+describe("backend/version.lua", function()
+    it("matches the version in millennium.toml", function()
+        local f = assert(io.open("millennium.toml", "rb"))
+        local toml = f:read("*a")
+        f:close()
+        local plugin = toml:match("%[plugin%](.-)\n%[")
+        local declared = plugin and plugin:match('\nversion%s*=%s*"([^"]+)"')
+        package.loaded["version"] = nil
+        assert.are.equal(declared, require("version"))
+    end)
+end)

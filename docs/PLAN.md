@@ -236,8 +236,8 @@ frontend/
   domain/                  # IDs, tag set, session visibility
   integrations/steam/      # Account, menus, toggle control, visibility seams
   services/                # Storage bridge, self-check, diagnostics
-backend/                   # Lua lifecycle, tag file, updater, patch loading
-hooks/                     # Hook definitions as data
+backend/                   # Lua lifecycle, tag file, updater, patch loading,
+                           # and hook definitions as data (hook_definitions.lua)
 tests/                     # Storage and hook fixture tests
 scripts/                   # CDP helper
 docs/                      # Research notes
