@@ -121,10 +121,42 @@ class FakeSettingsBackend implements SettingsBackend {
 		if (this.redactReply instanceof Error) return Promise.reject(this.redactReply);
 		return Promise.resolve(this.redactReply ?? text.split('daczo').join('<user>'));
 	}
-	previewImport(text: string) {
+	previewAccounts: string[] = [];
+	previewImport(text: string, account: string) {
+		this.previewAccounts.push(account);
 		const ids = new Set(text.split(/[\s,]+/).filter((x) => x !== ''));
 		for (const x of ids) if (!/^\d+$/.test(x)) return Promise.resolve({ ok: false, error: 'import_invalid', message: `not an App ID: ${x}` });
-		return Promise.resolve({ ok: true, count: ids.size });
+		return Promise.resolve({ ok: true, count: ids.size, kind: 'list', same_account: 'unknown' });
+	}
+	saveReply: unknown = {
+		ok: true,
+		name: 'Steam Discreet backup 2026-11-21.txt',
+		path: 'C:\\Users\\me\\Documents\\Steam Discreet\\Steam Discreet backup 2026-11-21.txt',
+		folder: 'C:\\Users\\me\\Documents\\Steam Discreet',
+		kind: 'documents',
+		count: 2,
+	};
+	savedFor: string[] = [];
+	saveBackup(account: string) {
+		this.savedFor.push(account);
+		return Promise.resolve(this.saveReply);
+	}
+	listReply: unknown = {
+		ok: true,
+		folder: 'C:\\Users\\me\\Documents\\Steam Discreet',
+		count: 2,
+		entries: [
+			'1:Steam Discreet backup 2026-11-21.txt\tSteam Discreet backup 2026-11-21.txt\tok\t2\t2026-11-21T19:40:00Z\tyes\tdocuments',
+			'2:old.txt\told.txt\tinvalid\t\t\tunknown\tfallback',
+		].join('\n'),
+	};
+	listBackups() {
+		return Promise.resolve(this.listReply);
+	}
+	backupText: Record<string, string> = { '1:Steam Discreet backup 2026-11-21.txt': '440\n620' };
+	readBackup(id: string) {
+		const text = this.backupText[id];
+		return Promise.resolve(text === undefined ? { ok: false, error: 'missing', message: 'That backup file is gone.' } : { ok: true, text });
 	}
 	updateStatus() {
 		return Promise.resolve(this.status);
@@ -281,7 +313,7 @@ describe('export and import', () => {
 
 	test('preview counts the pasted App IDs without saving', async () => {
 		const { settings, tags } = await setup([570]);
-		expect(await settings.previewImport('1, 2\n3')).toEqual({ ok: true, count: 3 });
+		expect(await settings.previewImport('1, 2\n3')).toEqual({ ok: true, count: 3, kind: 'list', saved: null, sameAccount: 'unknown' });
 		expect(await settings.previewImport('1 x')).toEqual({ ok: false, message: 'not an App ID: x' });
 		expect(tags.calls).toEqual(['open']);
 	});
@@ -290,6 +322,82 @@ describe('export and import', () => {
 		const { settings, tags } = await setup([570]);
 		expect((await settings.importText('   ', 'replace')).ok).toBe(false);
 		expect(tags.calls).toEqual(['open']);
+	});
+});
+
+describe('backup files', () => {
+	test('save backs up the signed-in account and says where the file went', async () => {
+		const { settings, backend } = await setup([570, 730]);
+		const result = await settings.saveBackup();
+		expect(result.ok).toBe(true);
+		expect(result.message).toContain('Saved a backup of 2 games to C:\\Users\\me\\Documents\\Steam Discreet\\Steam Discreet backup 2026-11-21.txt.');
+		expect(result.message).toContain('keep it private');
+		expect(backend.savedFor).toEqual([ACCOUNT]);
+	});
+
+	test('save says when Documents could not be used', async () => {
+		const { settings, backend } = await setup([570]);
+		backend.saveReply = { ok: true, name: 'b.txt', path: 'X\\Backups\\b.txt', folder: 'X\\Backups', kind: 'fallback', count: 1, fallback_reason: 'documents folder: access denied' };
+		const result = await settings.saveBackup();
+		expect(result.message).toContain("Your Documents folder could not be used (documents folder: access denied), so it went to the plugin's own folder.");
+		backend.saveReply = { ok: true, name: 'b.txt', path: 'X\\Backups\\b.txt', folder: 'X\\Backups', kind: 'fallback', count: 1 };
+		expect((await settings.saveBackup()).message).toContain('No Documents folder was found');
+	});
+
+	test('a failed or malformed save is reported as not saved', async () => {
+		const { settings, backend } = await setup([570]);
+		backend.saveReply = { ok: false, error: 'backup_empty', message: 'There are no tagged games to back up.' };
+		expect(await settings.saveBackup()).toEqual({ ok: false, message: 'No backup was saved: There are no tagged games to back up.' });
+		backend.saveReply = { ok: true, name: 'x' };
+		expect((await settings.saveBackup()).ok).toBe(false);
+	});
+
+	test('lists backups with counts, dates and status', async () => {
+		const { settings } = await setup([570]);
+		const list = await settings.listBackups();
+		if (!list.ok) throw new Error(list.message);
+		expect(list.entries).toEqual([
+			{
+				id: '1:Steam Discreet backup 2026-11-21.txt',
+				name: 'Steam Discreet backup 2026-11-21.txt',
+				status: 'ok',
+				count: 2,
+				saved: new Date('2026-11-21T19:40:00Z'),
+				sameAccount: 'yes',
+				location: 'documents',
+			},
+			{ id: '2:old.txt', name: 'old.txt', status: 'invalid', count: null, saved: null, sameAccount: 'unknown', location: 'fallback' },
+		]);
+	});
+
+	test('restore with Replace saves the current list for Undo, then swaps it', async () => {
+		const { settings, tags } = await setup([570, 730]);
+		const result = await settings.restoreBackup('1:Steam Discreet backup 2026-11-21.txt', 'replace');
+		expect(result).toEqual({ ok: true, message: 'Replaced. 2 games tagged now. Undo puts the previous list back.' });
+		expect([...tags.tags].sort((a, b) => a - b)).toEqual([440, 620]);
+		expect(settings.getView().undo).toMatchObject({ count: 2, action: 'replace' });
+		await settings.undoLast();
+		expect([...tags.tags].sort((a, b) => a - b)).toEqual([570, 730]);
+	});
+
+	test('restore with Add keeps the current tags', async () => {
+		const { settings, tags } = await setup([570]);
+		await settings.restoreBackup('1:Steam Discreet backup 2026-11-21.txt', 'merge');
+		expect([...tags.tags].sort((a, b) => a - b)).toEqual([440, 570, 620]);
+	});
+
+	test('a backup that cannot be read changes nothing', async () => {
+		const { settings, tags } = await setup([570]);
+		const result = await settings.restoreBackup('1:gone.txt', 'replace');
+		expect(result).toEqual({ ok: false, message: 'Nothing was restored: That backup file is gone.' });
+		expect([...tags.tags]).toEqual([570]);
+		expect(tags.calls).toEqual(['open']);
+	});
+
+	test('preview sends the signed-in account, so the backend can flag another account', async () => {
+		const { settings, backend } = await setup([570]);
+		await settings.previewImport('1');
+		expect(backend.previewAccounts).toEqual([ACCOUNT]);
 	});
 });
 

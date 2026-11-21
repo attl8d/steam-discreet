@@ -51,7 +51,8 @@ describe("tags_preview_import", function()
     end)
 
     it("counts distinct App IDs without saving", function()
-        assert.are.same({ ok = true, count = 2 }, _G.tags_preview_import("570, 730\n570"))
+        assert.are.same({ ok = true, count = 2, kind = "list", same_account = "unknown" },
+            _G.tags_preview_import("570, 730\n570"))
     end)
 
     it("refuses text that is not a tag list", function()

@@ -41,6 +41,24 @@ function M.make_fs_stub()
         dst:close()
         return true
     end
+    -- fs.list returns an array of entries ({ name, path, is_file, is_directory, ... }), or nil, message.
+    function fs.list(path)
+        if not fs.is_directory(path) then return nil, "not a directory" end
+        local entries = {}
+        local p = io.popen("ls -1A " .. shell_quote(path))
+        for name in p:lines() do
+            local full = path .. "/" .. name
+            entries[#entries + 1] = {
+                name = name,
+                path = full,
+                is_file = sh_ok("test -f " .. shell_quote(full)),
+                is_directory = fs.is_directory(full),
+                is_symlink = false,
+            }
+        end
+        p:close()
+        return entries
+    end
     function fs.remove(path)
         if not fs.exists(path) then return false end
         local ok, err = os.remove(path)
@@ -72,11 +90,13 @@ end
 
 local BACKEND_MODULES = {
     "logger", "millennium", "fs", "main", "hooks",
-    "tagstore.paths", "tagstore.format", "tagstore.fsio", "tagstore.store", "tagstore.rpc",
+    "tagstore.paths", "tagstore.format", "tagstore.fsio", "tagstore.store", "tagstore.rpc", "tagstore.backups",
+    "updater.sha256",
     "version", "updater", "updater.platform", "http", "utils", "json", "redact",
 }
 local RPC_GLOBALS = {
     "tags_open", "tags_add", "tags_remove", "tags_clear", "tags_export", "tags_import", "tags_preview_import",
+    "backup_save", "backup_list", "backup_read",
     "steam_discreet_update_status", "steam_discreet_update_rollback", "steam_discreet_hook_manifest",
     "steam_discreet_environment", "steam_discreet_redact",
 }

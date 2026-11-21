@@ -11,10 +11,12 @@
 local logger = require("logger")
 local format = require("tagstore.format")
 local Store = require("tagstore.store")
+local Backups = require("tagstore.backups")
 
 local M = {}
 
 M.store = Store.new({ logger = logger })
+M.backups = Backups.new({ logger = logger, version = require("version") })
 
 local function guarded(fn, ...)
     local ok, result = pcall(fn, ...)
@@ -86,25 +88,55 @@ function tags_import(account, text, mode)
 end
 
 ---@ffi
----Parse pasted import text without saving anything: how many App IDs it holds.
----Lets the settings page show counts in the Replace confirmation.
+---Parse pasted import text without saving anything: how many App IDs it holds,
+---and for a backup file when it was saved and whether it comes from `account`.
+---Lets the settings page show counts and warnings before Replace or Add.
 ---@param text string
+---@param account string SteamID64 of the signed-in account, or "" if unknown
 ---@return table
-function tags_preview_import(text)
+function tags_preview_import(text, account)
     return guarded(function()
-        local parsed = format.parse_import(text)
-        if parsed.status == "newer" then
+        local info = M.backups:describe(text, account)
+        if info.status == "newer" then
             return { ok = false, error = "import_newer",
-                message = "This export comes from a newer version of Steam Discreet." }
+                message = "This file comes from a newer version of Steam Discreet. Update the plugin first." }
         end
-        if parsed.status ~= "ok" then
+        if info.status ~= "ok" then
             return { ok = false, error = "import_invalid",
-                message = "The file is not a tag list: " .. tostring(parsed.reason) }
+                message = "The file is not a tag list: " .. tostring(info.reason) }
         end
-        local count = 0
-        for _ in pairs(parsed.set) do count = count + 1 end
-        return { ok = true, count = count }
+        return { ok = true, count = info.count, kind = info.kind, saved = info.saved, same_account = info.same_account }
     end)
+end
+
+---@ffi
+---Save a backup file of the account's tag list. Returns `name`, `path`, `folder`, `count`.
+---@param account string
+---@return table
+function backup_save(account)
+    return guarded(function()
+        local exported = M.store:export(account)
+        if not exported.ok then return exported end
+        local set = format.decode_id_list(exported.ids)
+        if not set then return { ok = false, error = "internal", message = "Could not read the tag list" } end
+        return M.backups:save(account, set)
+    end)
+end
+
+---@ffi
+---List backup files, newest first. `entries` is text, one backup per line (backups.lua).
+---@param account string
+---@return table
+function backup_list(account)
+    return guarded(function() return M.backups:list(account) end)
+end
+
+---@ffi
+---The text of one listed backup, by its id from backup_list. Changes nothing.
+---@param id string
+---@return table
+function backup_read(id)
+    return guarded(function() return M.backups:read(id) end)
 end
 
 M.functions = {
@@ -115,6 +147,9 @@ M.functions = {
     tags_export = tags_export,
     tags_import = tags_import,
     tags_preview_import = tags_preview_import,
+    backup_save = backup_save,
+    backup_list = backup_list,
+    backup_read = backup_read,
 }
 
 return M

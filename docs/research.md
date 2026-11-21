@@ -543,6 +543,19 @@ Live result, 21 November 2026, Mac client (macOS arm64), build 1794536281, Mille
 
 Live check: `bun scripts/cdp.ts eval @scripts/live/settings-check.js`. Read-only. It checks `PACKAGE_CL`, that `display_name` is a string for the first app, and prints the diagnostic report through `PLUGIN_LIST['steam-discreet'].sdDiagnostics.report()`. Also to check by eye: the page renders, Copy diagnostic report reaches the clipboard, export and import round-trip, Remove and Remove all, and the rollback button (only shown once an older version is saved).
 
+## Backup files (read from source, live check pending)
+
+Read from `.millennium/lsp/lua-types/fs.lua` (Starlight 1.1.7), 21 November 2026. Not yet called on the live client.
+
+| API | Used in | Notes |
+| --- | --- | --- |
+| `fs.list(path)` | `backend/tagstore/fsio.lua`, `list_files` | Array of `fs.Entry` (`name`, `path`, `is_file`, `is_directory`, `is_symlink`, `size`), or `nil, message`. Called under `pcall`; a failure only hides the list, and a backup can still be pasted into Import. |
+| `fs.is_directory(path)` | `fsio.is_dir` | Already used by `ensure_dir` since M2. |
+
+Folders, in order (`backend/tagstore/backups.lua`): `STEAM_DISCREET_BACKUP_DIR`, then the first existing of `%USERPROFILE%\Documents`, `%USERPROFILE%\OneDrive\Documents`, `$HOME/Documents`, with `Steam Discreet` appended, then `<tag storage root>/Backups`. Lua cannot call the Windows known-folder API, so a Documents folder moved elsewhere is not found and the fallback is used. Writing has been confirmed only under `%APPDATA%\SteamDiscreet` (above); the backend falls back there when the Documents write fails.
+
+Live check to run on the PC: Save backup twice (second file gets ` (2)`), Find backups lists both, Restore… Replace then Undo, and a backup saved on another account shows the warning. Note whether Documents is under OneDrive.
+
 ## macOS (live, 21 November 2026)
 
 MacBook with Apple Silicon (arm64), macOS 27.2.1. Steam client build **1794536281**, the same build as the Windows findings above, and `sp.js?contenthash=ecfb6699297d77d920fd` is byte-for-byte the same bundle, so the `library-visibility` find pattern matches unchanged.
