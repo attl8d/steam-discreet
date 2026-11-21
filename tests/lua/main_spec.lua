@@ -22,7 +22,7 @@ describe("backend/main.lua", function()
 
     it("declares a static patch table with the real hooks only", function()
         assert.is_table(plugin.patches)
-        assert.are.equal(1, #plugin.patches)
+        assert.are.equal(3, #plugin.patches)
         local p = plugin.patches[1]
         assert.is_truthy(p.file:find("sp", 1, true))
         assert.is_truthy(p.find:find("BIsVisible", 1, true))
@@ -30,6 +30,14 @@ describe("backend/main.lua", function()
         local replace = p.transforms[1].replace
         assert.is_truthy(replace:find('["library-visibility"]=1', 1, true))
         assert.is_truthy(replace:find("#{{self}}?.sdShouldHide?.(", 1, true))
+        local menu = plugin.patches[2]
+        assert.is_truthy(menu.find:find("GetTargetApps", 1, true))
+        assert.is_truthy(menu.transforms[1].replace:find('["game-context-menu"]=1', 1, true))
+        assert.is_truthy(menu.transforms[1].replace:find("#{{self}}?.sdTagMenuItem?.(", 1, true))
+        local toggle = plugin.patches[3]
+        assert.is_truthy(toggle.find:find("ViewFiltersBar", 1, true))
+        assert.is_truthy(toggle.transforms[1].replace:find('["reveal-toggle"]=1', 1, true))
+        assert.is_truthy(toggle.transforms[1].replace:find("#{{self}}?.sdRevealToggle?.(", 1, true))
         for _, patch in ipairs(plugin.patches) do
             assert.is_falsy(patch.find:find("ExampleIsFiltered", 1, true))
         end
