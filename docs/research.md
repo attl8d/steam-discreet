@@ -277,7 +277,7 @@ BIsVisible(Z){const te=typeof Z=="number"?o.tw.GetAppOverviewByAppID(Z):Z;return
 - Play Next suggestions (`GetSuggestionsToShow`);
 - a major-update event context menu (`Gr.md.BIsVisible(Ui)`).
 
-Library search does its own `BIsHidden` filtering (`pn=en.filter(...!G.md.BIsHidden(...))`) on `appStore.allApps`, but it still lost the game with only `BIsVisible` patched (below), so its results go through a visible collection too.
+The `BIsHidden`-only search filter on `appStore.allApps` (`pn=en.filter(...!G.md.BIsHidden(...))`) is Big Picture search, not the desktop Library search (corrected in M4, see "M4 full coverage"). The desktop sidebar search filters collection `visibleApps`, which is why it lost the game below.
 
 #### The patch (backend/main.lua)
 
@@ -475,7 +475,8 @@ Read on 21 November 2026 from Valve's public `steamui_websrc_all.zip` for build 
 
 | Surface | Where the games come from | Covered by `library-visibility` | Backfill |
 | --- | --- | --- | --- |
-| Sidebar, Installed, Favorites, collections, Library search | collection `visibleApps` (M1, live) | yes, live on Windows and Mac | n/a |
+| Sidebar, Installed, Favorites, collections | collection `visibleApps` | yes: live on Windows (M1, before the refresh fix) and on the Mac (`m3-cycle.js`, live refresh) | n/a |
+| Library search (sidebar search box) | `uiStore.SetSearchText` swaps `currentAppFilter` for a search filter; the sidebar rows are `GetCollectionList()` collections' `visibleApps.filter(currentAppFilter.Matches)` | yes: exact-name search seen once on Windows in M1 (static, before the refresh fix); the M4 script now runs the tag, reveal, hide, untag cycle on it, result below | n/a |
 | Recent Games shelf (showcase `recent-games`, component `T0`) | `GetCollection(Recent).visibleApps`; `recent` is `allRecentAppsCollection.allApps` with `mru_index`, wrapped like every collection | yes | yes: the shelf maps the whole filtered list |
 | Collection shelves (any other showcase) | `m_fnSort(cs, gQ(eSortBy))`, a memoize-one of `cs.visibleApps.slice().sort(...)`. `gQ` returns a new comparator on every call, so the memo never hits and every render reads `visibleApps` | yes | yes: a one-row grid of the filtered list |
 | "All collections" shelf and the Collections view | tiles (`at` / `dt` in the collection tile module): artwork is the top 13 of `visibleApps` by playtime; the count label (`Ue`) reads `visibleApps` and `GetAppCountWithToolsFilter` in two `useObserver` calls in one component | yes | yes |
@@ -499,7 +500,7 @@ Read on 21 November 2026 from Valve's public `steamui_websrc_all.zip` for build 
 
 ### Live check
 
-`scripts/live/m4-surfaces.js` opens Library Home (`steam://open/library`, which, unlike `steam://open/games`, does not change the Games filter) and, for one game from the first four of Recent Games and one game with a What's New entry (or `SD_CHECK_APPIDS`), runs untagged, tagged with the toggle off, toggle on, toggle off again, untagged. At each step it checks `BIsVisible`, Recent Games, Play Next, What's New and takeover entries, every user collection that holds the game, images in the main window whose URL carries the App ID and labels with the game's exact name, and that native Hidden, Favorites and filter state are unchanged. Globals it reads besides M1's: `playNextStore`, `libraryEventStore` (both assigned to `window` in sp.js, source only until this run).
+`scripts/live/m4-surfaces.js` opens Library Home (`steam://open/library`, which, unlike `steam://open/games`, does not change the Games filter) and, for one game from the first four of Recent Games and one game with a What's New entry (or `SD_CHECK_APPIDS`), runs untagged, tagged with the toggle off, toggle on, toggle off again, untagged. At each step it checks `BIsVisible`, Recent Games, Play Next, What's New and takeover entries, every user collection that holds the game, images in the main window whose URL carries the App ID and labels with the game's exact name, and that native Hidden, Favorites and filter state are unchanged. Since `3725f15` it also picks a Play Next suggestion. The version after the first review also counts images and labels separately for the sidebar (the highest ancestor of the reveal toggle narrower than 60% and taller than half the window) and the rest of the window (Home); and runs the same cycle on an exact-name sidebar search for the first game (`uiStore.SetSearchText(name)`, then `SetSearchText('')`, reporting `filterRestored`). Globals it reads besides M1's: `playNextStore`, `libraryEventStore` (both assigned to `window` in sp.js, source only until this run).
 
 First run, 21 November 2026, Mac client, build 1794536281, plugin at main `8bb198e` (output: branch `live-out/m4-probe` at `3cd6df5`, `live-out/m4-surfaces.json`, game names removed). `ok: true`, self-check `ok`, tag file empty at the end.
 
@@ -508,11 +509,11 @@ First run, 21 November 2026, Mac client, build 1794536281, plugin at main `8bb19
 | 1062090 (from Recent Games) | Recent Games, Favorites, one user collection; 3 images and 2 name labels on Home | gone from all of them; 0 images, 0 labels | back everywhere; 3 images, 2 labels |
 | 291650 (from What's New) | 1 What's New entry, one user collection; 1 image and 1 label on Home | 0 What's New entries; 0 images, 0 labels | 1 entry; 1 image, 1 label |
 
-Each change showed within 800 ms with no reload, and turning the toggle off again hid both again. Native Hidden (10 games), Favorites and the filter state never changed.
+The image and label counts in these two runs covered the whole main window, sidebar included, so for 291650 and 2706300 (1 image, 1 label) they may be only the sidebar row; Home rendering is confirmed by the data checks, and by the DOM only for 1062090 (more hits than one row). Each change showed within 800 ms with no reload, and turning the toggle off again hid both again. Native Hidden (10 games), Favorites and the filter state never changed.
 
-Second run with the script at `3725f15` (output on `live-out/m4-probe` at `3bc79ee`), same build and plugin: `ok: true`, every step clean for three games. 1062090 and 291650 behaved as in the first run. 2706300, picked from Play Next, left the Play Next suggestions (true, false, true, false, true) and its Home image and label (1 to 0 and back) at each step.
+Second run with the script at `3725f15` (output on `live-out/m4-probe` at `3bc79ee`), same build and plugin: `ok: true`, every step clean for three games. 1062090 and 291650 behaved as in the first run. 2706300, picked from Play Next, left the Play Next suggestions (true, false, true, false, true) and its image and label in the main window (1 to 0 and back) at each step.
 
-So **Working and tested on the Mac:** Recent Games, collection shelves and lists, ordinary What's New entries, Play Next, and what Home renders for them. **Not seen live:** takeover events (none were showing in either run, and they cannot be produced on demand; same `BIsVisible` filter as ordinary entries). Windows is still to re-confirm.
+So **Working and tested on the Mac:** Recent Games, collection shelves and lists, ordinary What's New entries and Play Next (data), and the main window's rendering of them. Exact-name search and the Home/sidebar split are in the third run. **Not seen live:** takeover events (none were showing in either run, and they cannot be produced on demand; same `BIsVisible` filter as ordinary entries). Windows is still to re-confirm.
 
 ## macOS (live, 21 November 2026)
 

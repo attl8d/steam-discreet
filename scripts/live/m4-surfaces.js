@@ -6,8 +6,11 @@
 // Checks each Library Home surface separately for one or more games: the
 // Recent Games shelf, Play Next, What's New (ordinary and takeover events),
 // the user's collection shelves and collection tiles, and what the main
-// window actually renders on Home. For each game it runs: untagged (baseline),
-// tagged with the toggle off, toggle on, toggle off again, untagged.
+// window renders (images and name labels, counted separately for Home and
+// the sidebar). For each game it runs: untagged (baseline), tagged with the
+// toggle off, toggle on, toggle off again, untagged. Then it runs the same
+// cycle on an exact-name Library search for the first game, and clears the
+// search again.
 //
 // Without SD_CHECK_APPIDS it picks up to three games itself: the first
 // untagged game among the first four of Recent Games (rendered on Home
@@ -15,7 +18,10 @@
 // the first untagged Play Next suggestion.
 //
 // It opens Library Home with steam://open/library (which does not change the
-// Games filter). It never calls Steam's own write paths; the only write is
+// Games filter). The search step types into the sidebar search through
+// uiStore.SetSearchText, as the search box does, and clears it at the end;
+// the report says whether the filter state matches the start. It never calls
+// Steam's collection, Hidden or Private write paths; the only stored write is
 // the plugin's tag file, and every game it tagged is untagged at the end,
 // even after a failure.
 (async () => {
@@ -59,17 +65,43 @@
 	// Steam's own news apps, which What's New always shows (module 4257, build 1794536281).
 	const special = (id) => id === 593110 || id === 1675200 || id === 1675180;
 
+	// The sidebar column: the highest ancestor of our reveal toggle that is
+	// narrower than 60% of the window and taller than half of it. Hashed class
+	// names are never used.
+	const sidebarRoot = (doc) => {
+		const t = doc.querySelector('[aria-label*="adult games"], [aria-label*="loading your tags"]');
+		if (!t) return null;
+		const w = doc.defaultView?.innerWidth ?? 0;
+		const h = doc.defaultView?.innerHeight ?? 0;
+		let best = null;
+		for (let el = t; el && el !== doc.body; el = el.parentElement) {
+			const r = el.getBoundingClientRect();
+			if (r.width < w * 0.6 && r.height > h * 0.5) best = el;
+		}
+		return best;
+	};
+	// Images whose URL carries the App ID, and leaf elements whose text is the
+	// game's exact name, counted separately inside and outside the sidebar.
+	const domCounts = (appid, name) => {
+		const doc = mainDoc();
+		if (!doc) return null;
+		const side = sidebarRoot(doc);
+		const re = new RegExp(`[/_]${appid}[/._]`);
+		const out = { sidebarFound: !!side, home: { imgs: 0, labels: 0 }, sidebar: { imgs: 0, labels: 0 } };
+		for (const i of doc.querySelectorAll('img')) {
+			if (re.test(i.currentSrc || i.src || '')) out[side?.contains(i) ? 'sidebar' : 'home'].imgs++;
+		}
+		if (name) {
+			for (const el of doc.querySelectorAll('div,span,a')) {
+				if (el.childElementCount === 0 && el.textContent?.trim() === name) out[side?.contains(el) ? 'sidebar' : 'home'].labels++;
+			}
+		}
+		return out;
+	};
+
 	// What one game looks like on every surface right now.
 	const snap = (appid) => {
 		const name = apps.GetAppOverviewByAppID(appid)?.display_name ?? '';
-		const doc = mainDoc();
-		let imgs = null;
-		let textHits = null;
-		if (doc) {
-			const re = new RegExp(`[/_]${appid}[/._]`);
-			imgs = [...doc.querySelectorAll('img')].filter((i) => re.test(i.currentSrc || i.src || '')).length;
-			textHits = name ? [...doc.querySelectorAll('div,span,a')].filter((el) => el.childElementCount === 0 && el.textContent?.trim() === name).length : null;
-		}
 		const shelves = {};
 		for (const c of cs.userCollections ?? []) {
 			if (c?.apps?.has?.(appid)) shelves[c.id] = c.visibleApps.some((a) => a.appid === appid);
@@ -81,12 +113,23 @@
 			whatsNew: events ? safe(() => eventApps(events.GetLibraryHomeBestEventsForUser()).filter((id) => id === appid).length) : null,
 			takeover: events ? safe(() => eventApps(events.GetTakeOverEvents()).filter((id) => id === appid).length) : null,
 			collections: shelves,
-			dom: { imgs, textHits },
+			dom: domCounts(appid, name),
 			hidden: cs.BIsHidden(appid),
 			favorite: cs.BIsFavorite(appid),
 			hiddenSize: cs.GetCollection('hidden')?.apps?.size,
 			filter: filterState(),
 		};
+	};
+
+	const compareDom = (d, b, expectShown) => {
+		const problems = [];
+		if (!d || !b) return problems;
+		for (const area of ['home', 'sidebar']) {
+			for (const k of ['imgs', 'labels']) {
+				if (b[area][k] > 0 && (expectShown ? d[area][k] === 0 : d[area][k] !== 0)) problems.push(`${area} ${k}: ${d[area][k]}, baseline ${b[area][k]}`);
+			}
+		}
+		return problems;
 	};
 
 	// Compare a step against the baseline. expectShown: should the game be wherever it was at baseline?
@@ -99,8 +142,7 @@
 		if (typeof base.whatsNew === 'number' && base.whatsNew > 0 && s.whatsNew !== (expectShown ? base.whatsNew : 0)) problems.push(`What's New: ${s.whatsNew} entries, baseline ${base.whatsNew}`);
 		if (typeof base.takeover === 'number' && base.takeover > 0 && s.takeover !== (expectShown ? base.takeover : 0)) problems.push(`takeover: ${s.takeover}, baseline ${base.takeover}`);
 		for (const [id, has] of Object.entries(base.collections)) if (has && s.collections[id] !== want(true)) problems.push(`collection ${id}: listed=${s.collections[id]}`);
-		if (base.dom.imgs > 0 && (expectShown ? s.dom.imgs === 0 : s.dom.imgs !== 0)) problems.push(`Home images: ${s.dom.imgs}, baseline ${base.dom.imgs}`);
-		if (base.dom.textHits > 0 && (expectShown ? s.dom.textHits === 0 : s.dom.textHits !== 0)) problems.push(`Home name labels: ${s.dom.textHits}, baseline ${base.dom.textHits}`);
+		problems.push(...compareDom(s.dom, base.dom, expectShown));
 		if (s.hidden !== base.hidden || s.hiddenSize !== base.hiddenSize) problems.push('native Hidden changed');
 		if (s.favorite !== base.favorite) problems.push('Favorite changed');
 		if (s.filter !== base.filter) problems.push('filter state changed');
@@ -129,6 +171,61 @@
 	await sleep(1500);
 	if (!mainDoc()) report.notes.push('main window document not found; DOM checks skipped');
 
+	// Exact-name Library search (the sidebar search box): Steam's own
+	// uiStore.SetSearchText, the call the box makes on every keystroke. It
+	// swaps the sidebar to a search filter; SetSearchText('') restores the
+	// Games filter. Results are read the way the sidebar builds its rows.
+	const ui = globalThis.uiStore;
+	const searchActive = () => safe(() => ui?.BIsSearchActive?.() === true) === true;
+	const inSearchResults = (appid) =>
+		safe(() => (ui.GetCollectionList() ?? []).some((c) => c.visibleApps.filter(ui.currentAppFilter.Matches).some((a) => a.appid === appid)));
+	const searchCycle = async (appid) => {
+		const name = apps.GetAppOverviewByAppID(appid)?.display_name ?? '';
+		const g = { appid, search: name ? '<exact name>' : null, steps: [] };
+		report.search = g;
+		if (!name || typeof ui?.SetSearchText !== 'function' || typeof ui?.GetCollectionList !== 'function') {
+			g.error = 'search API or game name missing; skipped';
+			report.ok = false;
+			return;
+		}
+		if (searchActive()) {
+			g.error = 'a search was already active; skipped';
+			return;
+		}
+		ui.SetSearchText(name);
+		await sleep(1000);
+		const look = () => ({ visible: cs.BIsVisible(appid), found: inSearchResults(appid), dom: domCounts(appid, name), filter: filterState() });
+		const base = look();
+		g.base = base;
+		if (base.found !== true) {
+			g.error = 'game not in its own exact-name search results to start with';
+			report.ok = false;
+			return;
+		}
+		const run = async (stepName, fn, expectShown) => {
+			await fn();
+			await sleep(800);
+			const s = look();
+			const problems = [];
+			if (s.found !== expectShown) problems.push(`search result: found=${s.found}`);
+			if (s.filter !== base.filter) problems.push('search filter changed');
+			if (s.dom && base.dom && base.dom.sidebar.labels > 0 && (expectShown ? s.dom.sidebar.labels === 0 : s.dom.sidebar.labels !== 0)) problems.push(`sidebar labels: ${s.dom.sidebar.labels}, baseline ${base.dom.sidebar.labels}`);
+			g.steps.push({ name: stepName, problems, snapshot: s });
+			if (problems.length) report.ok = false;
+		};
+		await run('tagged, toggle off', async () => {
+			tagged.push(appid);
+			await lib.tagGames([appid]);
+		}, false);
+		await run('toggle on', () => lib.setRevealed(true), true);
+		await run('toggle off again', () => lib.setRevealed(false), false);
+		await run('untagged', () => lib.untagGames([appid]), true);
+		ui.SetSearchText('');
+		await sleep(500);
+	};
+	const searchId = ids.find((id) => !lib.isTagged(id));
+	const startFilter = filterState();
+
 	lib.setRevealed(false);
 	const tagged = [];
 	try {
@@ -154,24 +251,34 @@
 				if (problems.length) report.ok = false;
 			};
 			await run('tagged, toggle off', async () => {
-				await lib.tagGames([appid]);
 				tagged.push(appid);
+				await lib.tagGames([appid]);
 			}, false);
 			await run('toggle on', () => lib.setRevealed(true), true);
 			await run('toggle off again', () => lib.setRevealed(false), false);
-			await run('untagged', async () => {
-				await lib.untagGames([appid]);
-				tagged.splice(tagged.indexOf(appid), 1);
-			}, true);
+			await run('untagged', () => lib.untagGames([appid]), true);
 		}
+		if (searchId !== undefined) await searchCycle(searchId);
 	} catch (e) {
 		report.ok = false;
 		report.error = String(e);
 	} finally {
 		lib.setRevealed(false);
-		if (tagged.length) {
+		if (searchActive()) {
 			try {
-				await lib.untagGames(tagged.slice());
+				ui.SetSearchText('');
+			} catch (e) {
+				report.ok = false;
+				report.searchRestoreError = String(e);
+			}
+			await sleep(300);
+		}
+		report.filterRestored = filterState() === startFilter;
+		if (!report.filterRestored) report.ok = false;
+		const left = [...new Set(tagged)].filter((id) => lib.isTagged(id));
+		if (left.length) {
+			try {
+				await lib.untagGames(left);
 			} catch (e) {
 				report.ok = false;
 				report.untagError = String(e);
