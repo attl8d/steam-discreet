@@ -9,7 +9,7 @@ export default tseslint.config(
 	{
 		languageOptions: {
 			parserOptions: {
-				project: ['./frontend/tsconfig.json', './webview/tsconfig.json', './tests/tsconfig.json'],
+				project: ['./frontend/tsconfig.json', './webview/tsconfig.json', './tests/tsconfig.json', './scripts/tsconfig.json'],
 				tsconfigRootDir: import.meta.dirname,
 			},
 		},

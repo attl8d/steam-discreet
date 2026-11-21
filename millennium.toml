@@ -19,9 +19,11 @@ entry = "frontend/index.tsx"
 entry = "webview/preload.ts"
 
 [compiler]
-# "auto" installs straight into the local Millennium plugins folder.
-# M1 sets an explicit development path here once the Windows setup is known.
-output_path = "auto"
+# Development builds go straight into Millennium's plugins folder on the dev PC.
+# Millennium v3.6.3 packs each plugin into one <id>.star file there, so the
+# path names the file, not the folder. "auto" resolves the same file from the
+# Steam path in the registry.
+output_path = "C:/Program Files (x86)/Steam/millennium/plugins/steam-discreet.star"
 
 [dev]
 auto_restart = true
