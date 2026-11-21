@@ -1,0 +1,7 @@
+{
+	"filename": "C:\\Program Files (x86)\\Steam\\steamui\\chunk~1a2b3c4d.js",
+	"cases": [
+		{ "fixture": "anchor.js", "expect": "attached", "transformMatches": [1] },
+		{ "fixture": "renamed.js", "expect": "absent" }
+	]
+}

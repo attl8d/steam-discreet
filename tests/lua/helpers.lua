@@ -71,7 +71,7 @@ function M.install_millennium_stubs()
 end
 
 local BACKEND_MODULES = {
-    "logger", "millennium", "fs", "main",
+    "logger", "millennium", "fs", "main", "hooks",
     "tagstore.paths", "tagstore.format", "tagstore.fsio", "tagstore.store", "tagstore.rpc",
     "version", "updater", "updater.platform", "http", "utils", "json",
 }

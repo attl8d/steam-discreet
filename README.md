@@ -8,7 +8,8 @@ Status: scaffold only. No hiding logic exists yet. See [docs/PLAN.md](docs/PLAN.
 
 - Millennium >= 3.4.0 (developed against 3.6.3)
 - [Bun](https://bun.com/) >= 1.3
-- For backend tests: LuaJIT, [busted](https://lunarmodules.github.io/busted/) and [luacheck](https://github.com/lunarmodules/luacheck)
+- For backend and hook tests: LuaJIT, [busted](https://lunarmodules.github.io/busted/) and [luacheck](https://github.com/lunarmodules/luacheck)
+- Optional, for `test:hooks:rust`: a Rust toolchain (`cargo`)
 
 ## Commands
 
@@ -19,10 +20,11 @@ Status: scaffold only. No hiding logic exists yet. See [docs/PLAN.md](docs/PLAN.
 | `bun run build` | Packs the plugin (`output_path` in `millennium.toml`) |
 | `bun run typecheck` | Strict TypeScript check of frontend, webview and tests |
 | `bun run lint` | ESLint (typescript-eslint strict, type-checked) |
-| `bun run test` | Frontend unit tests (`bun test`) |
+| `bun run test` | Frontend unit tests and hook fixture tests (`bun test`; the hook tests call `luajit`) |
 | `bun run lint:lua` | luacheck on the backend and Lua specs |
 | `bun run test:lua` | Backend specs with busted under LuaJIT, outside Steam |
-| `bun run check` | All of the above |
+| `bun run test:hooks:rust` | Repeats the hook fixtures with the Rust `regex` crate Millennium uses (needs `cargo`) |
+| `bun run check` | Everything above except `test:hooks:rust`, which CI runs separately |
 
 Lua specs live in `tests/lua/*_spec.lua`. `tests/lua/helpers.lua` stubs the `logger` and `millennium` modules that Millennium injects, so backend modules can be required directly.
 
@@ -57,9 +59,11 @@ frontend/
   integrations/steam/      The only code that touches Steam globals
   services/                Storage bridge, self-check, diagnostics
 backend/                   Lua lifecycle, tag file, updater, patch loading
-hooks/                     Hook definitions as data
+  hook_definitions.lua     Hook definitions as data (see tests/hooks/README.md)
 tests/frontend/            bun tests
 tests/lua/                 busted specs
+tests/hooks/               Hook fixture harness and fixtures
+tools/patch-crosscheck/    Repeats the hook fixtures with the real Rust regex crate
 scripts/                   CDP helper
 docs/                      Plan and research notes
 CLAUDE.md                  Working rules and (later) the repair guide

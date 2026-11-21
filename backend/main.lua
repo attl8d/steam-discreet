@@ -1,10 +1,10 @@
 -- Steam Discreet backend entry point.
--- Lifecycle, the tag storage RPC functions (M2) and the self-updater (M6).
--- Patch loading from hooks/ (M5) is added by its own milestone; see
--- docs/PLAN.md.
+-- Lifecycle, patch loading from hook_definitions.lua (M5), the tag storage
+-- RPC functions (M2) and the self-updater (M6); see docs/PLAN.md.
 
 local logger     = require("logger")
 local millennium = require("millennium")
+local hooks      = require("hooks")
 local version    = require("version")
 
 -- Registers the frontend-callable tags_* functions as globals.
@@ -13,6 +13,10 @@ require("tagstore.rpc")
 local M = {}
 
 M.version = version
+
+-- Read once, when Millennium loads this file. Problems in the data file never
+-- stop the plugin: the affected hooks are left out and Steam stays unpatched.
+local loaded_hooks = hooks.load()
 
 -- The updater must never be able to stop the plugin from loading or
 -- unloading, so every call into it is protected.
@@ -63,6 +67,12 @@ rawset(_G, "steam_discreet_update_rollback", M.update_rollback)
 
 function M.on_load()
     logger:info("Steam Discreet " .. version .. " loaded on Millennium " .. tostring(millennium.version()))
+    if loaded_hooks.error then
+        logger:error("Hooks disabled: " .. loaded_hooks.error)
+    end
+    for _, r in ipairs(loaded_hooks.rejected) do
+        logger:error("Hook '" .. r.id .. "' rejected: " .. r.reason)
+    end
     millennium.ready()
     -- No network here: Millennium waits for on_load before it counts the
     -- plugin as started. Noting a manual rollback is a quick local read.
@@ -91,8 +101,13 @@ function M.on_frontend_loaded()
     start_update_check()
 end
 
+-- What the frontend self-check expects. Wired to the settings page later.
+function M.hook_manifest()
+    return hooks.manifest(loaded_hooks)
+end
+
 -- Static patch table, read once by Millennium at load. It cannot depend on
--- account or configuration. Empty until hook definitions exist (M1/M5).
-M.patches = {}
+-- account or configuration. Placeholder hooks are never included.
+M.patches = hooks.patches(loaded_hooks)
 
 return M
