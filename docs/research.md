@@ -519,7 +519,7 @@ Third run with the script at `26b8f7c` (output on `live-out/m4-probe` at `a5201e
 | --- | --- | --- |
 | 1062090 (Recent Games) | 2 images, 1 label; 0 when hidden; back each time | 1 image, 1 label (its row); 0 when hidden; back |
 | 291650 (What's New) | 1 image, 1 label; 0 when hidden; back | 0 (not in the sidebar's current view) |
-| 2706300 (Play Next) | 0 at baseline: its Play Next card was not rendered (the shelf is lower on Home or virtualised), so Home rendering is not shown for it; the data check passed | 1 image, 1 label; 0 when hidden; back |
+| 2706300 (Play Next) | 0 at every step: its Play Next card was not detected (probably below the fold or virtualised, or its image URL does not carry the App ID), so its Home rendering is not shown; the data check passed | 1 image, 1 label; 0 when hidden; back |
 
 Exact-name search on 1062090: in the results at baseline; tagged with the toggle off, not found and 0 images and labels in both areas; toggle on, found (sidebar 1/1); off again, not found; untagged, found. While the search is active the recorded filter has empty filter groups (the Games and Installed options cleared, only the search text set). That is Steam's own behaviour: `uiStore.SetSearchText` starts a text search with a new empty filter (`this.m_currentAppFilter=new u.E6`), and clearing it (`ResetSearch`) restores `collectionsAppFilter`, which the run confirmed (back to the Games and Installed options). Clearing also clears the sidebar selection and collapses the Hidden section, as when a user clears the search.
 
