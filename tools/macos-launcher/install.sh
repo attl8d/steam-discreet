@@ -23,11 +23,16 @@ lsregister="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchS
 # Sets the default app for the steam:// scheme. LSSetDefaultHandlerForURLScheme
 # is deprecated but still the only call that sets a scheme handler without UI.
 set_handler() {
-    osascript -l JavaScript -e "ObjC.import('CoreServices'); \$.LSSetDefaultHandlerForURLScheme(\$('steam'), \$('$1'))" >/dev/null
+    local rc
+    rc="$(osascript -l JavaScript -e "ObjC.import('CoreServices'); \$.LSSetDefaultHandlerForURLScheme(\$('steam'), \$('$1'))")"
+    if [ "$rc" != "0" ]; then
+        echo "could not set the steam:// handler to $1 (OSStatus $rc)" >&2
+        return 1
+    fi
 }
 
 current_handler() {
-    osascript -l JavaScript -e "ObjC.import('CoreServices'); ObjC.unwrap(\$.LSCopyDefaultHandlerForURLScheme(\$('steam')))" 2>/dev/null || echo "none"
+    osascript -l JavaScript -e "ObjC.import('CoreServices'); ObjC.unwrap(ObjC.castRefToObject(\$.LSCopyDefaultHandlerForURLScheme(\$('steam'))))" 2>/dev/null || echo "none"
 }
 
 status() {
