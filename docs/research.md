@@ -467,6 +467,51 @@ Rerun with the fixed script (450ceee, same plugin build; outputs at `live-out/m4
 
 One read-only run made a few seconds after Steam started found no item and no `game-context-menu` marker, and a run 5 seconds later passed. Its output was not kept. The marker is set by the patched `render()` itself, before the plugin is called, so a menu rendered by patched code always sets it, even when the plugin frontend has not loaded yet. No marker therefore means the menu came from unpatched code (or did not open). That fits the first UI load: Millennium reloads the UI with patches once the backends are ready (see "Loading"). It is the same startup window PLAN.md accepts for the brief flash. Separately, if a menu opens after the reload but before the plugin frontend has loaded, the marker is set and that one menu has no item; the next one does. The check script now records `markersBefore` and `markersAfterMenu`, so a repeat would show which case it was.
 
+## M4 full coverage (Library Home, live on the Mac)
+
+Read on 21 November 2026 from Valve's public `steamui_websrc_all.zip` for build **1794536281** (same zip and sha256 as in "M3 library hiding"). The question was which desktop Library surfaces do **not** go through `collectionStore.BIsVisible`, the seam hook `library-visibility` already patches. Answer: none of the v1 surfaces. Every one reads `visibleApps` of a collection or calls `BIsVisible` itself, inside a mobx observer, so it hides and refreshes with the existing hook and the M3 signal. No new hook was added (principle 5).
+
+### Surfaces and their data path (desktop Library Home, sp.js around offset 12.74M)
+
+| Surface | Where the games come from | Covered by `library-visibility` | Backfill |
+| --- | --- | --- | --- |
+| Sidebar, Installed, Favorites, collections, Library search | collection `visibleApps` (M1, live) | yes, live on Windows and Mac | n/a |
+| Recent Games shelf (showcase `recent-games`, component `T0`) | `GetCollection(Recent).visibleApps`; `recent` is `allRecentAppsCollection.allApps` with `mru_index`, wrapped like every collection | yes | yes: the shelf maps the whole filtered list |
+| Collection shelves (any other showcase) | `m_fnSort(cs, gQ(eSortBy))`, a memoize-one of `cs.visibleApps.slice().sort(...)`. `gQ` returns a new comparator on every call, so the memo never hits and every render reads `visibleApps` | yes | yes: a one-row grid of the filtered list |
+| "All collections" shelf and the Collections view | tiles (`at` / `dt` in the collection tile module): artwork is the top 13 of `visibleApps` by playtime; the count label (`Ue`) reads `visibleApps` and `GetAppCountWithToolsFilter` in two `useObserver` calls in one component | yes | yes |
+| Play Next (`Z1`) | `playNextStore.GetSuggestionsToShow(devToggle)`: server list filtered with `BIsVisible` (the unfiltered branch is a settings-zoo developer toggle) | yes | no: the list comes from Steam's servers, so a hidden game leaves one fewer suggestion |
+| What's New (`Wl`) | `libraryEventStore.GetWhatsNewEvents()`, whose `GetLibraryHomeBestEventsForUser()` and `GetTakeOverEvents()` filter by `BIsVisible(event.appid)` | yes | yes: up to 18 cards are taken after filtering |
+| Empty-library message (`xl`) | `visibleApps.length` of Recent and the app-type collections | yes | n/a |
+
+**What's New and App IDs.** Each event carries exactly one `appid` (the clan's app). `UpdateBestEventsForCurrentUser` already drops any event whose `appid` has no app overview (not in the library). Steam's own news apps 593110, 1675200 and 1675180 (module 4257) always pass, and cannot be tagged in practice. So there is no multi-game or ambiguous entry in this list to leave visible: an entry is about one game, and it is skipped only if that game is tagged and the toggle is off.
+
+**Count-only readers (the M3 known gap).** Every desktop caller of `GetAppCountWithToolsFilter` also reads `visibleApps` in the same render: the sidebar collection headers (`nTotalCollectionSize` next to `visibleApps.filter(...)`), the collection page header, the showcase header and the collection tile label. A tag or toggle change recomputes `visibleApps`, those components re-render, and they read the count after `ClearAppCounts()` emptied it. So the stale second reader seen in the test model does not occur on desktop. The only count-only caller is the Big Picture tab bar (below).
+
+### Not covered, outside v1
+
+| Surface | What it does | Why left |
+| --- | --- | --- |
+| Big Picture search (`b4`, near offset 10.79M) | `appStore.allApps` filtered with `BIsHidden` only, so a tagged game is found by name | Big Picture and the Deck UI are not a v1 surface (PLAN covers the desktop Library). A fix would be one more hook on that filter. |
+| Big Picture Home "Recently completed" downloads | download queue | Downloads are out of v1. |
+| What's New settings dialog (gear icon) | lists games the user set to "show more" or "show less" (`GetAppsShowingMore/Less`, filtered only by "is in the library") | Only reachable by opening What's New settings, and only lists games the user re-prioritised there. Recorded as a gap. |
+| "Raised/Lowered priority for <game>" notice in What's New | names the game the user just re-prioritised | Shown only right after the user acted on that game. |
+| Marketing message dialog | a Steam store web page | Store, out of scope. |
+
+### Live check
+
+`scripts/live/m4-surfaces.js` opens Library Home (`steam://open/library`, which, unlike `steam://open/games`, does not change the Games filter) and, for one game from the first four of Recent Games and one game with a What's New entry (or `SD_CHECK_APPIDS`), runs untagged, tagged with the toggle off, toggle on, toggle off again, untagged. At each step it checks `BIsVisible`, Recent Games, Play Next, What's New and takeover entries, every user collection that holds the game, images in the main window whose URL carries the App ID and labels with the game's exact name, and that native Hidden, Favorites and filter state are unchanged. Globals it reads besides M1's: `playNextStore`, `libraryEventStore` (both assigned to `window` in sp.js, source only until this run).
+
+First run, 21 November 2026, Mac client, build 1794536281, plugin at main `8bb198e` (output: branch `live-out/m4-probe` at `3cd6df5`, `live-out/m4-surfaces.json`, game names removed). `ok: true`, self-check `ok`, tag file empty at the end.
+
+| Game | On at baseline | Tagged, toggle off | Toggle on, and after untag |
+| --- | --- | --- | --- |
+| 1062090 (from Recent Games) | Recent Games, Favorites, one user collection; 3 images and 2 name labels on Home | gone from all of them; 0 images, 0 labels | back everywhere; 3 images, 2 labels |
+| 291650 (from What's New) | 1 What's New entry, one user collection; 1 image and 1 label on Home | 0 What's New entries; 0 images, 0 labels | 1 entry; 1 image, 1 label |
+
+Each change showed within 800 ms with no reload, and turning the toggle off again hid both again. Native Hidden (10 games), Favorites and the filter state never changed.
+
+So **Working and tested on the Mac:** Recent Games, collection shelves and lists, ordinary What's New entries, and what Home renders for them. **Not yet seen live:** Play Next (neither game was a suggestion; the script now also picks one) and takeover events (none were showing; these cannot be produced on demand). Windows is still to re-confirm.
+
 ## macOS (live, 21 November 2026)
 
 MacBook with Apple Silicon (arm64), macOS 27.2.1. Steam client build **1794536281**, the same build as the Windows findings above, and `sp.js?contenthash=ecfb6699297d77d920fd` is byte-for-byte the same bundle, so the `library-visibility` find pattern matches unchanged.

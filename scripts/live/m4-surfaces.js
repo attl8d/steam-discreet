@@ -9,9 +9,10 @@
 // window actually renders on Home. For each game it runs: untagged (baseline),
 // tagged with the toggle off, toggle on, toggle off again, untagged.
 //
-// Without SD_CHECK_APPIDS it picks up to two games itself: the first untagged
-// game among the first four of Recent Games (rendered on Home without
-// scrolling), and the first untagged game with a What's New entry.
+// Without SD_CHECK_APPIDS it picks up to three games itself: the first
+// untagged game among the first four of Recent Games (rendered on Home
+// without scrolling), the first untagged game with a What's New entry, and
+// the first untagged Play Next suggestion.
 //
 // It opens Library Home with steam://open/library (which does not change the
 // Games filter). It never calls Steam's own write paths; the only write is
@@ -117,6 +118,10 @@
 		const n = Array.isArray(news) ? news.find((id) => typeof id === 'number' && !special(id) && !ids.includes(id) && !lib.isTagged(id)) : undefined;
 		if (n !== undefined) ids.push(n);
 		else report.notes.push("no untagged game with a What's New entry");
+		const next = playNext ? safe(() => playNext.GetSuggestionsToShow(false).apps) : [];
+		const pn = Array.isArray(next) ? next.find((id) => typeof id === 'number' && !ids.includes(id) && !lib.isTagged(id)) : undefined;
+		if (pn !== undefined) ids.push(pn);
+		else report.notes.push('no untagged game in Play Next (the shelf may not be on Home, or Steam has no suggestions)');
 	}
 	if (ids.length === 0) return { ...report, ok: false, error: 'no game to check; set SD_CHECK_APPIDS' };
 
