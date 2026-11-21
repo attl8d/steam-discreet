@@ -230,6 +230,123 @@
         "hiddenSize": 10,
         "filter": "{\"nFormatVersion\":2,\"strSearchText\":\"\",\"filterGroups\":[{\"rgOptions\":[1],\"bAcceptUnion\":true},{\"rgOptions\":[5],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false}],\"setSuggestions\":{}}"
       }
+    },
+    {
+      "appid": 2706300,
+      "name": "<game>",
+      "steps": [
+        {
+          "name": "tagged, toggle off",
+          "problems": [],
+          "snapshot": {
+            "visible": false,
+            "recent": false,
+            "playNext": false,
+            "whatsNew": 0,
+            "takeover": 0,
+            "collections": {
+              "uc-06TxKmcG5RN4": false,
+              "uc-A*+eSA9oq65wf": false
+            },
+            "dom": {
+              "imgs": 0,
+              "textHits": 0
+            },
+            "hidden": false,
+            "favorite": false,
+            "hiddenSize": 10,
+            "filter": "{\"nFormatVersion\":2,\"strSearchText\":\"\",\"filterGroups\":[{\"rgOptions\":[1],\"bAcceptUnion\":true},{\"rgOptions\":[5],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false}],\"setSuggestions\":{}}"
+          }
+        },
+        {
+          "name": "toggle on",
+          "problems": [],
+          "snapshot": {
+            "visible": true,
+            "recent": false,
+            "playNext": true,
+            "whatsNew": 0,
+            "takeover": 0,
+            "collections": {
+              "uc-06TxKmcG5RN4": true,
+              "uc-A*+eSA9oq65wf": true
+            },
+            "dom": {
+              "imgs": 1,
+              "textHits": 1
+            },
+            "hidden": false,
+            "favorite": false,
+            "hiddenSize": 10,
+            "filter": "{\"nFormatVersion\":2,\"strSearchText\":\"\",\"filterGroups\":[{\"rgOptions\":[1],\"bAcceptUnion\":true},{\"rgOptions\":[5],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false}],\"setSuggestions\":{}}"
+          }
+        },
+        {
+          "name": "toggle off again",
+          "problems": [],
+          "snapshot": {
+            "visible": false,
+            "recent": false,
+            "playNext": false,
+            "whatsNew": 0,
+            "takeover": 0,
+            "collections": {
+              "uc-06TxKmcG5RN4": false,
+              "uc-A*+eSA9oq65wf": false
+            },
+            "dom": {
+              "imgs": 0,
+              "textHits": 0
+            },
+            "hidden": false,
+            "favorite": false,
+            "hiddenSize": 10,
+            "filter": "{\"nFormatVersion\":2,\"strSearchText\":\"\",\"filterGroups\":[{\"rgOptions\":[1],\"bAcceptUnion\":true},{\"rgOptions\":[5],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false}],\"setSuggestions\":{}}"
+          }
+        },
+        {
+          "name": "untagged",
+          "problems": [],
+          "snapshot": {
+            "visible": true,
+            "recent": false,
+            "playNext": true,
+            "whatsNew": 0,
+            "takeover": 0,
+            "collections": {
+              "uc-06TxKmcG5RN4": true,
+              "uc-A*+eSA9oq65wf": true
+            },
+            "dom": {
+              "imgs": 1,
+              "textHits": 1
+            },
+            "hidden": false,
+            "favorite": false,
+            "hiddenSize": 10,
+            "filter": "{\"nFormatVersion\":2,\"strSearchText\":\"\",\"filterGroups\":[{\"rgOptions\":[1],\"bAcceptUnion\":true},{\"rgOptions\":[5],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false}],\"setSuggestions\":{}}"
+          }
+        }
+      ],
+      "base": {
+        "visible": true,
+        "recent": false,
+        "playNext": true,
+        "whatsNew": 0,
+        "takeover": 0,
+        "collections": {
+          "uc-06TxKmcG5RN4": true,
+          "uc-A*+eSA9oq65wf": true
+        },
+        "dom": {
+          "imgs": 1,
+          "textHits": 1
+        },
+        "hidden": false,
+        "favorite": false,
+        "hiddenSize": 10,
+        "filter": "{\"nFormatVersion\":2,\"strSearchText\":\"\",\"filterGroups\":[{\"rgOptions\":[1],\"bAcceptUnion\":true},{\"rgOptions\":[5],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false}],\"setSuggestions\":{}}"
+      }
     }
   ],
   "notes": [],
