@@ -92,6 +92,17 @@ function steam_discreet_update_rollback()
 end
 
 ---@ffi
+---Diagnostic report text with the user's own folder and login names removed.
+---The real values stay in the backend. Returns the text unchanged on error.
+---@param text string
+---@return string
+function steam_discreet_redact(text)
+    local ok, result = pcall(function() return require("redact").redact(text) end)
+    if ok and type(result) == "string" then return result end
+    return type(text) == "string" and text or ""
+end
+
+---@ffi
 ---Plugin and Millennium versions and the OS, for the diagnostic report, as a JSON string.
 ---@return string|nil
 function steam_discreet_environment()

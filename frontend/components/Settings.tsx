@@ -56,6 +56,9 @@ export function SettingsContent() {
 				<Field label="Steam Discreet is not loaded" description="Restart Steam. If this stays, copy the Millennium logs." />
 			) : (
 				<>
+					<Section name="Undo">
+						<UndoSection settings={settings} />
+					</Section>
 					<Section name="Tagged games">
 						<TagsSection settings={settings} />
 					</Section>
@@ -176,7 +179,7 @@ function TagsSection({ settings }: { settings: SettingsService }) {
 					label="Remove all tags"
 					description={
 						confirmClear
-							? `Remove all ${String(count)} tags? Every game shows normally again. The previous list stays in the tag backups, and an export can bring it back.`
+							? `Remove all ${String(count)} tags? Every game shows normally again. The current list is saved first, and an Undo button puts it back until Steam restarts. Export it to keep it longer.`
 							: 'Untags every game for this Steam account.'
 					}
 				>
@@ -219,12 +222,55 @@ function TagsSection({ settings }: { settings: SettingsService }) {
 	);
 }
 
+/** Shown after Remove all or Replace: the saved list, and a button to put it back. */
+function UndoSection({ settings }: { settings: SettingsService }) {
+	const view = useSettingsView(settings);
+	const [result, setResult] = useState<ActionResult | null>(null);
+	const [busy, setBusy] = useState(false);
+	const undo = view.undo;
+	if (undo === null) return <ResultLine result={result} />;
+	const what = undo.action === 'clear' ? 'Remove all' : 'Replace';
+	return (
+		<>
+			<Field
+				label={`Undo ${what}`}
+				description={`Your previous list of ${games(undo.count)} is saved until Steam restarts. Undo puts it back, or copy it from below to keep it.`}
+			>
+				<DialogButton
+					style={buttonStyle}
+					disabled={!editable(view) || busy}
+					onClick={() => {
+						setBusy(true);
+						void settings
+							.undoLast()
+							.then(setResult)
+							.finally(() => {
+								setBusy(false);
+							});
+					}}
+				>
+					Undo
+				</DialogButton>
+			</Field>
+			<Field childrenLayout="below" indentLevel={1}>
+				<textarea style={textAreaStyle} readOnly value={undo.text} onFocus={(e) => { e.currentTarget.select(); }} />
+			</Field>
+			<ResultLine result={result} />
+		</>
+	);
+}
+
+function games(n: number): string {
+	return `${String(n)} game${n === 1 ? '' : 's'}`;
+}
+
 function TransferSection({ settings }: { settings: SettingsService }) {
 	const view = useSettingsView(settings);
 	const ref = useRef<HTMLDivElement>(null);
 	const [exported, setExported] = useState<string | null>(null);
 	const [importText, setImportText] = useState('');
-	const [confirmReplace, setConfirmReplace] = useState(false);
+	/** Set while the Replace confirmation is open: how many App IDs the paste holds. */
+	const [confirmReplace, setConfirmReplace] = useState<number | null>(null);
 	const [result, setResult] = useState<ActionResult | null>(null);
 	const [busy, setBusy] = useState(false);
 	const canEdit = editable(view) && !busy;
@@ -261,6 +307,21 @@ function TransferSection({ settings }: { settings: SettingsService }) {
 		}
 	};
 
+	const askReplace = async () => {
+		setBusy(true);
+		try {
+			const preview = await settings.previewImport(importText);
+			if (preview.ok) {
+				setResult(null);
+				setConfirmReplace(preview.count);
+			} else {
+				setResult({ ok: false, message: `Nothing was replaced: ${preview.message}` });
+			}
+		} finally {
+			setBusy(false);
+		}
+	};
+
 	return (
 		<div ref={ref}>
 			<Field label="Export" description="Copies your tag list (App IDs only) so you can keep it or move it to another PC.">
@@ -290,25 +351,25 @@ function TransferSection({ settings }: { settings: SettingsService }) {
 					placeholder="Paste here"
 					onChange={(e) => {
 						setImportText(e.currentTarget.value);
-						setConfirmReplace(false);
+						setConfirmReplace(null);
 					}}
 				/>
 			</Field>
 			<Field
 				indentLevel={1}
 				description={
-					confirmReplace
-						? 'Replace your whole tag list with the pasted one? Games not in it are untagged. The previous list stays in the tag backups.'
+					confirmReplace !== null
+						? `Replace your ${games(view.tags.tags.size)} with the ${games(confirmReplace)} pasted? Games not in the paste are untagged. The current list is saved first, and an Undo button puts it back until Steam restarts.`
 						: 'Add keeps your current tags. Replace swaps the whole list.'
 				}
 			>
-				{confirmReplace ? (
+				{confirmReplace !== null ? (
 					<>
 						<DialogButton
 							style={buttonStyle}
 							disabled={!canEdit}
 							onClick={() => {
-								setConfirmReplace(false);
+								setConfirmReplace(null);
 								void doImport('replace');
 							}}
 						>
@@ -317,7 +378,7 @@ function TransferSection({ settings }: { settings: SettingsService }) {
 						<DialogButton
 							style={buttonStyle}
 							onClick={() => {
-								setConfirmReplace(false);
+								setConfirmReplace(null);
 							}}
 						>
 							Cancel
@@ -338,7 +399,7 @@ function TransferSection({ settings }: { settings: SettingsService }) {
 							style={buttonStyle}
 							disabled={!canEdit || importText.trim() === ''}
 							onClick={() => {
-								setConfirmReplace(true);
+								void askReplace();
 							}}
 						>
 							Replace…
@@ -416,6 +477,7 @@ function DiagnosticsSection({ settings }: { settings: SettingsService }) {
 function UpdatesSection({ settings }: { settings: SettingsService }) {
 	const [status, setStatus] = useState<UpdateStatus | null | 'loading'>('loading');
 	const [confirm, setConfirm] = useState(false);
+	const [busy, setBusy] = useState(false);
 	const [result, setResult] = useState<ActionResult | null>(null);
 
 	useEffect(() => {
@@ -432,13 +494,18 @@ function UpdatesSection({ settings }: { settings: SettingsService }) {
 	if (status === null) return <Field label="Updates" description="The updater did not answer. The diagnostic report has details." />;
 
 	const rollback = async () => {
-		const res = await settings.rollback();
-		setResult(
-			res.ok
-				? { ok: true, message: `Version ${res.to} will be put back at the next Steam start, and this version will not be downloaded again.` }
-				: { ok: false, message: `Rollback failed: ${res.message}` },
-		);
-		setStatus(await settings.updateStatus());
+		setBusy(true);
+		try {
+			const res = await settings.rollback();
+			setResult(
+				res.ok
+					? { ok: true, message: `Version ${res.to} will be put back at the next Steam start, and this version will not be downloaded again.` }
+					: { ok: false, message: `Rollback failed: ${res.message}` },
+			);
+			setStatus(await settings.updateStatus());
+		} finally {
+			setBusy(false);
+		}
 	};
 
 	return (
@@ -462,6 +529,7 @@ function UpdatesSection({ settings }: { settings: SettingsService }) {
 						<>
 							<DialogButton
 								style={buttonStyle}
+								disabled={busy}
 								onClick={() => {
 									setConfirm(false);
 									void rollback();
@@ -481,6 +549,7 @@ function UpdatesSection({ settings }: { settings: SettingsService }) {
 					) : (
 						<DialogButton
 							style={buttonStyle}
+							disabled={busy}
 							onClick={() => {
 								setConfirm(true);
 							}}

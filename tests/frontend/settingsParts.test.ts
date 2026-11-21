@@ -142,4 +142,15 @@ describe('clean', () => {
 		expect(clean('at /Users/someone/Library/x and /home/me/y')).toBe('at /Users/<user>/Library/x and /home/<user>/y');
 		expect(clean('line one\n  line two')).toBe('line one line two');
 	});
+	test('folder names with spaces, doubled backslashes and newer SteamID64s', () => {
+		expect(clean('C:\\Users\\John Smith\\AppData\\Roaming\\SteamDiscreet')).toBe('C:\\Users\\<user>\\AppData\\Roaming\\SteamDiscreet');
+		expect(clean('/Users/Attila Daczo/Library/x')).toBe('/Users/<user>/Library/x');
+		expect(clean('open "C:\\\\Users\\\\daczo\\\\AppData\\\\x" failed')).toBe('open "C:\\\\Users\\\\<user>\\\\AppData\\\\x" failed');
+		expect(clean('\\\\?\\C:\\Users\\daczo\\x')).toBe('\\\\?\\C:\\Users\\<user>\\x');
+		expect(clean('id 76561202000000001 and 76561198000000001')).toBe('id <steamid> and <steamid>');
+	});
+	test('a storage reason built the way store.lua builds it', () => {
+		const reason = 'Cannot create storage folder (APPDATA): C:\\Users\\Jane Doe\\AppData\\Roaming\\SteamDiscreet: Access is denied';
+		expect(clean(reason)).toBe('Cannot create storage folder (APPDATA): C:\\Users\\<user>\\AppData\\Roaming\\SteamDiscreet: Access is denied');
+	});
 });

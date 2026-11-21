@@ -10,8 +10,11 @@ import type { StorageState } from './tagStorage';
  * session with "fix it", next to the repair guide in CLAUDE.md.
  *
  * It never contains game names, App IDs, the tag list, the tag count or the
- * Steam account. Paths in error messages have the user folder and any
- * SteamID64 replaced. Pure: the caller gathers the inputs.
+ * Steam account. User folders and Steam IDs are removed three ways: by shape
+ * here (`clean`), by value for the signed-in account (`redactAccount`), and by
+ * value for the real folder and login names in the backend
+ * (backend/redact.lua, applied by services/settings.ts). Pure: the caller
+ * gathers the inputs.
  */
 
 export interface DiagnosticInput {
@@ -22,6 +25,8 @@ export interface DiagnosticInput {
 	readonly selfCheck: SelfCheck;
 	readonly storage: { readonly state: StorageState; readonly writable: boolean; readonly reason: string | null } | null;
 	readonly update: UpdateStatus | null;
+	/** The signed-in SteamID64, removed from the report by value. Never printed. */
+	readonly account: string | null;
 }
 
 export const HOOK_STATE_TEXT: Record<HookState, string> = {
@@ -95,7 +100,7 @@ export function buildDiagnosticReport(input: DiagnosticInput): string {
 	}
 	lines.push('');
 	lines.push('Repair guide: CLAUDE.md in https://github.com/attl8d/steam-discreet');
-	return lines.join('\n');
+	return redactAccount(lines.join('\n'), input.account);
 }
 
 function iso(unixSeconds: number): string {
@@ -103,12 +108,39 @@ function iso(unixSeconds: number): string {
 	return Number.isNaN(d.getTime()) ? String(unixSeconds) : d.toISOString();
 }
 
-/** Removes personal parts of error text: user folder names and SteamID64s. */
+// A path separator as it appears in text: one or more slashes or backslashes,
+// so escaped strings ("C:\\\\Users\\\\x") match too.
+const SEP = String.raw`(?:\\+|/+)`;
+const WINDOWS_PROFILE = new RegExp(String.raw`([A-Za-z]:${SEP}(?:Users|Documents and Settings)${SEP})[^\\/\r\n'"<>|]+`, 'gi');
+const UNIX_HOME = new RegExp(String.raw`(${SEP}(?:Users|home)${SEP})[^\\/\r\n'"<>|]+`, 'g');
+/** Every individual SteamID64 is 7656119xxxxxxxxxx up to 76561202255233023. */
+const STEAM_ID64 = /\b7656\d{13}\b/g;
+const STEAM_ID3 = /\[U:1:\d+\]/g;
+
+/**
+ * Removes personal parts of error text by shape: the user folder name in
+ * Windows and Unix profile paths (up to the next separator, so names with
+ * spaces go too) and anything shaped like a Steam ID.
+ */
 export function clean(text: string): string {
 	return text
-		.replace(/([A-Za-z]:[\\/](?:Users|Documents and Settings)[\\/])[^\\/\s'"]+/gi, '$1<user>')
-		.replace(/(\/(?:Users|home)\/)[^/\s'"]+/g, '$1<user>')
-		.replace(/\b7656119\d{10}\b/g, '<steamid>')
+		.replace(WINDOWS_PROFILE, '$1<user>')
+		.replace(UNIX_HOME, '$1<user>')
+		.replace(STEAM_ID64, '<steamid>')
+		.replace(STEAM_ID3, '<steamid>')
 		.replace(/\s+/g, ' ')
 		.trim();
+}
+
+const STEAM_ID64_BASE = 76561197960265728n;
+
+/** Removes the signed-in account by value: its SteamID64 and its 32-bit account ID. */
+export function redactAccount(text: string, account: string | null): string {
+	if (account === null || !/^\d{17}$/.test(account)) return text;
+	let out = text.split(account).join('<steamid>');
+	const accountId = BigInt(account) - STEAM_ID64_BASE;
+	if (accountId > 0n) {
+		out = out.replace(new RegExp(String.raw`\b${accountId.toString()}\b`, 'g'), '<accountid>');
+	}
+	return out;
 }

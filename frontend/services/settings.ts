@@ -1,3 +1,4 @@
+import type { AccountId } from '../domain/accountId';
 import type { AppId } from '../domain/appId';
 import { tagRows, type TagRow } from '../domain/tagList';
 import {
@@ -24,6 +25,10 @@ export interface SettingsBackend {
 	updateStatus(): Promise<unknown>;
 	rollback(): Promise<unknown>;
 	environment(): Promise<unknown>;
+	/** Removes the real folder and login names (backend/redact.lua). */
+	redact(text: string): Promise<unknown>;
+	/** Parses import text without saving (`tags_preview_import`). */
+	previewImport(text: string): Promise<unknown>;
 }
 
 /** Read-only facts from the Steam client (frontend/integrations/steam/clientInfo.ts). */
@@ -32,9 +37,19 @@ export interface SettingsSteam {
 	appName(appId: AppId): string | null;
 }
 
+/** The list as it was before Remove all or Replace, kept for this session only. */
+export interface UndoBackup {
+	readonly text: string;
+	readonly count: number;
+	readonly action: 'clear' | 'replace';
+	/** Dropped when another account signs in, so it can never land on the wrong list. */
+	readonly account: AccountId;
+}
+
 export interface SettingsView {
 	readonly library: LibraryState;
 	readonly tags: TagSnapshot;
+	readonly undo: UndoBackup | null;
 }
 
 export type ActionResult = { readonly ok: true; readonly message: string } | { readonly ok: false; readonly message: string };
@@ -44,11 +59,14 @@ export function millenniumSettingsBackend(): SettingsBackend {
 		updateStatus: () => backend.steam_discreet_update_status(),
 		rollback: () => backend.steam_discreet_update_rollback(),
 		environment: () => backend.steam_discreet_environment(),
+		redact: (text) => backend.steam_discreet_redact(text),
+		previewImport: (text) => backend.tags_preview_import(text),
 	};
 }
 
 export class SettingsService {
 	private view: SettingsView;
+	private undo: UndoBackup | null = null;
 	private readonly listeners = new Set<() => void>();
 
 	constructor(
@@ -58,7 +76,7 @@ export class SettingsService {
 		private readonly steam: SettingsSteam,
 		private readonly now: () => Date = () => new Date(),
 	) {
-		this.view = { library: library.getState(), tags: storage.snapshot };
+		this.view = { library: library.getState(), tags: storage.snapshot, undo: null };
 		const update = () => {
 			this.refreshView();
 		};
@@ -101,12 +119,19 @@ export class SettingsService {
 		}
 	}
 
+	/**
+	 * Removes every tag. The current list is exported first and kept for an
+	 * Undo; if that export fails, nothing is removed.
+	 */
 	async clearAll(): Promise<ActionResult> {
 		const blocked = this.editBlocked();
 		if (blocked !== null) return { ok: false, message: blocked };
+		const backup = await this.backup('clear');
+		if (!backup.ok) return { ok: false, message: `Nothing was removed, because the current list could not be saved first: ${backup.message}` };
 		const result = await this.storage.clear();
 		if (!result.ok) return { ok: false, message: `Nothing was removed: ${result.message}` };
-		return { ok: true, message: 'All tags removed. The previous list is kept in the tag backups.' };
+		this.setUndo(backup.undo);
+		return { ok: true, message: 'All tags removed. Undo puts them back.' };
 	}
 
 	async exportText(): Promise<{ readonly ok: true; readonly text: string } | { readonly ok: false; readonly message: string }> {
@@ -114,20 +139,63 @@ export class SettingsService {
 		return result.ok ? result : { ok: false, message: `Export failed: ${result.message}` };
 	}
 
+	/** How many App IDs pasted text holds, without saving anything. */
+	async previewImport(text: string): Promise<{ readonly ok: true; readonly count: number } | { readonly ok: false; readonly message: string }> {
+		if (text.trim() === '') return { ok: false, message: 'Paste an exported tag list first.' };
+		try {
+			const raw: unknown = await this.backend.previewImport(text);
+			if (typeof raw === 'object' && raw !== null) {
+				const r = raw as Record<string, unknown>;
+				if (r.ok === true && typeof r.count === 'number') return { ok: true, count: r.count };
+				if (typeof r.message === 'string' && r.message !== '') return { ok: false, message: r.message };
+			}
+			return { ok: false, message: 'Unexpected reply from tag storage' };
+		} catch (error) {
+			return { ok: false, message: describe(error) };
+		}
+	}
+
+	/**
+	 * Imports pasted text. Replace exports the current list first and keeps it
+	 * for an Undo; if that export fails, nothing is replaced.
+	 */
 	async importText(text: string, mode: ImportMode): Promise<ActionResult> {
 		if (text.trim() === '') return { ok: false, message: 'Paste an exported tag list first.' };
 		const blocked = this.editBlocked();
 		if (blocked !== null) return { ok: false, message: blocked };
-		const before = this.view.tags.tags.size;
+		let undo: UndoBackup | null = null;
+		if (mode === 'replace') {
+			const backup = await this.backup('replace');
+			if (!backup.ok) {
+				return { ok: false, message: `Nothing was replaced, because the current list could not be saved first: ${backup.message}` };
+			}
+			undo = backup.undo;
+		}
+		const before = this.storage.snapshot.tags.size;
 		const result = await this.storage.importText(text, mode);
 		if (!result.ok) return { ok: false, message: `Nothing was imported: ${result.message}` };
+		if (undo !== null) this.setUndo(undo);
 		const after = result.snapshot.tags.size;
 		const games = (n: number) => `${String(n)} game${n === 1 ? '' : 's'}`;
 		const message =
 			mode === 'merge'
 				? `Imported. ${games(after - before)} added; ${games(after)} tagged in total.`
-				: `Replaced. ${games(after)} tagged now.`;
+				: `Replaced. ${games(after)} tagged now. Undo puts the previous list back.`;
 		return { ok: true, message: result.warning === null ? message : `${message} ${result.warning}` };
+	}
+
+	/** Puts back the list saved before the last Remove all or Replace. */
+	async undoLast(): Promise<ActionResult> {
+		const undo = this.undo;
+		if (undo === null) return { ok: false, message: 'There is nothing to undo.' };
+		const blocked = this.editBlocked();
+		if (blocked !== null) return { ok: false, message: blocked };
+		// An empty saved list cannot be imported ("no App IDs"), so it is restored by clearing.
+		const result = undo.count === 0 ? await this.storage.clear() : await this.storage.importText(undo.text, 'replace');
+		if (!result.ok) return { ok: false, message: `Undo failed; the saved list is still here: ${result.message}` };
+		this.setUndo(null);
+		const n = result.snapshot.tags.size;
+		return { ok: true, message: `Restored. ${String(n)} game${n === 1 ? '' : 's'} tagged.` };
 	}
 
 	async updateStatus(): Promise<UpdateStatus | null> {
@@ -148,8 +216,8 @@ export class SettingsService {
 
 	async diagnosticReport(): Promise<string> {
 		const [environment, update] = await Promise.all([this.environment(), this.updateStatus()]);
-		const tags = this.view.tags;
-		return buildDiagnosticReport({
+		const tags = this.storage.snapshot;
+		const report = buildDiagnosticReport({
 			generatedAt: this.now(),
 			environment,
 			steamBuild: safely(() => this.steam.steamBuild(), null),
@@ -157,7 +225,32 @@ export class SettingsService {
 			selfCheck: this.library.selfCheck(),
 			storage: tags.state === 'unloaded' ? null : { state: tags.state, writable: tags.writable, reason: tags.reason },
 			update,
+			account: tags.account,
 		});
+		// Second pass in the backend, with the real folder and login names.
+		try {
+			const redacted: unknown = await this.backend.redact(report);
+			if (typeof redacted === 'string' && redacted !== '') return redacted;
+		} catch {
+			// Keep the report cleaned by shape and account.
+		}
+		return report;
+	}
+
+	private async backup(
+		action: UndoBackup['action'],
+	): Promise<{ readonly ok: true; readonly undo: UndoBackup } | { readonly ok: false; readonly message: string }> {
+		const { account, tags } = this.storage.snapshot;
+		if (account === null) return { ok: false, message: 'No account is loaded' };
+		const count = tags.size;
+		const exported = await this.storage.exportText();
+		if (!exported.ok) return { ok: false, message: exported.message };
+		return { ok: true, undo: { text: exported.text, count, action, account } };
+	}
+
+	private setUndo(undo: UndoBackup | null): void {
+		this.undo = undo;
+		this.refreshView(true);
 	}
 
 	private async environment(): Promise<Environment | null> {
@@ -175,11 +268,15 @@ export class SettingsService {
 		return null;
 	}
 
-	private refreshView(): void {
+	private refreshView(force = false): void {
 		const library = this.library.getState();
 		const tags = this.storage.snapshot;
-		if (library === this.view.library && tags === this.view.tags) return;
-		this.view = { library, tags };
+		if (this.undo !== null && tags.account !== this.undo.account) {
+			this.undo = null;
+			force = true;
+		}
+		if (!force && library === this.view.library && tags === this.view.tags) return;
+		this.view = { library, tags, undo: this.undo };
 		for (const listener of this.listeners) {
 			try {
 				listener();

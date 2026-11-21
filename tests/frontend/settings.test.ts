@@ -43,8 +43,10 @@ class TagBackend implements TagStorageRpc {
 			this.tags.clear();
 		});
 	}
+	failExport = false;
 	exportText() {
-		return this.reply('export', () => undefined, { text: 'steam-discreet-tags 1\n570\n' });
+		if (this.failExport) return Promise.resolve({ ok: false, error: 'unreadable', message: 'cannot read', state: 'ok', writable: true, ids: '' });
+		return this.reply('export', () => undefined, { text: [...this.tags].sort((a, b) => a - b).join('\n') });
 	}
 	importText(_: string, text: string, mode: string) {
 		return this.reply(`import:${mode}`, () => {
@@ -114,6 +116,16 @@ class FakeSettingsBackend implements SettingsBackend {
 	rollbackReply: unknown = JSON.stringify({ result: 'rollback_staged', to: '0.1.0' });
 	env: unknown = JSON.stringify({ plugin_version: '0.2.0', millennium_version: 'v3.6.3', os: 'Windows', arch: 'x64' });
 	rollbacks = 0;
+	redactReply: unknown = undefined;
+	redact(text: string) {
+		if (this.redactReply instanceof Error) return Promise.reject(this.redactReply);
+		return Promise.resolve(this.redactReply ?? text.split('daczo').join('<user>'));
+	}
+	previewImport(text: string) {
+		const ids = new Set(text.split(/[\s,]+/).filter((x) => x !== ''));
+		for (const x of ids) if (!/^\d+$/.test(x)) return Promise.resolve({ ok: false, error: 'import_invalid', message: `not an App ID: ${x}` });
+		return Promise.resolve({ ok: true, count: ids.size });
+	}
 	updateStatus() {
 		return Promise.resolve(this.status);
 	}
@@ -178,12 +190,36 @@ describe('tag list', () => {
 		expect(settings.getView().tags.tags.has(570 as AppId)).toBe(true);
 	});
 
-	test('clear all removes every tag', async () => {
-		const { settings, tags } = await setup([570, 730]);
+	test('clear all saves the list first, removes every tag, and Undo restores the exact list', async () => {
+		const { settings, tags } = await setup([570, 730, 440]);
 		const result = await settings.clearAll();
 		expect(result.ok).toBe(true);
 		expect(tags.tags.size).toBe(0);
-		expect(tags.calls).toContain('clear');
+		expect(tags.calls.slice(1, 3)).toEqual(['export', 'clear']);
+		expect(settings.getView().undo).toMatchObject({ count: 3, action: 'clear' });
+		const undone = await settings.undoLast();
+		expect(undone).toEqual({ ok: true, message: 'Restored. 3 games tagged.' });
+		expect([...tags.tags].sort((a, b) => a - b)).toEqual([440, 570, 730]);
+		expect(settings.getView().undo).toBeNull();
+	});
+
+	test('clear all is refused when the current list cannot be exported first', async () => {
+		const { settings, tags } = await setup([570]);
+		tags.failExport = true;
+		const result = await settings.clearAll();
+		expect(result.ok).toBe(false);
+		expect(result.message).toContain('could not be saved first');
+		expect([...tags.tags]).toEqual([570]);
+		expect(tags.calls).not.toContain('clear');
+		expect(settings.getView().undo).toBeNull();
+	});
+
+	test('a failed undo keeps the saved list', async () => {
+		const { settings, tags } = await setup([570]);
+		await settings.clearAll();
+		tags.failWrites = true;
+		expect((await settings.undoLast()).ok).toBe(false);
+		expect(settings.getView().undo?.text).toBe('570');
 	});
 
 	test('nothing is changed while the store is read-only', async () => {
@@ -209,7 +245,7 @@ describe('tag list', () => {
 describe('export and import', () => {
 	test('export returns the backend text', async () => {
 		const { settings } = await setup([570]);
-		expect(await settings.exportText()).toEqual({ ok: true, text: 'steam-discreet-tags 1\n570\n' });
+		expect(await settings.exportText()).toEqual({ ok: true, text: '570' });
 	});
 
 	test('merge adds to the list and says how many were added', async () => {
@@ -219,11 +255,35 @@ describe('export and import', () => {
 		expect(tags.calls).toContain('import:merge');
 	});
 
-	test('replace swaps the list', async () => {
+	test('replace saves the list first, swaps it, and Undo restores it', async () => {
 		const { settings, tags } = await setup([570, 730]);
 		const result = await settings.importText('440', 'replace');
-		expect(result).toEqual({ ok: true, message: 'Replaced. 1 game tagged now.' });
+		expect(result).toEqual({ ok: true, message: 'Replaced. 1 game tagged now. Undo puts the previous list back.' });
 		expect([...tags.tags]).toEqual([440]);
+		expect(settings.getView().undo).toMatchObject({ count: 2, action: 'replace' });
+		await settings.undoLast();
+		expect([...tags.tags].sort((a, b) => a - b)).toEqual([570, 730]);
+	});
+
+	test('replace is refused when the current list cannot be exported first', async () => {
+		const { settings, tags } = await setup([570]);
+		tags.failExport = true;
+		expect((await settings.importText('440', 'replace')).ok).toBe(false);
+		expect([...tags.tags]).toEqual([570]);
+	});
+
+	test('merge needs no backup and offers no undo', async () => {
+		const { settings, tags } = await setup([570]);
+		tags.failExport = true;
+		expect((await settings.importText('730', 'merge')).ok).toBe(true);
+		expect(settings.getView().undo).toBeNull();
+	});
+
+	test('preview counts the pasted App IDs without saving', async () => {
+		const { settings, tags } = await setup([570]);
+		expect(await settings.previewImport('1, 2\n3')).toEqual({ ok: true, count: 3 });
+		expect(await settings.previewImport('1 x')).toEqual({ ok: false, message: 'not an App ID: x' });
+		expect(tags.calls).toEqual(['open']);
 	});
 
 	test('an empty paste is refused before reaching the backend', async () => {
@@ -292,6 +352,21 @@ describe('diagnostic report', () => {
 		expect(report).toContain(`- ${VISIBILITY_HOOK_ID}: MISSING`);
 		expect(report).toContain('Looking for code: `BIsVisible\\(`');
 		expect(settings.selfCheck().overall).toBe('warning');
+	});
+
+	test('the backend redaction pass runs on the report, and a failing one keeps the cleaned text', async () => {
+		const { settings, backend } = await setup();
+		backend.status = JSON.stringify({ current_version: '0.2.0', last_error: 'open D:\\Profiles\\daczo\\x failed' });
+		expect(await settings.diagnosticReport()).toContain('D:\\Profiles\\<user>\\x');
+		backend.redactReply = new Error('gone');
+		expect(await settings.diagnosticReport()).toContain('Last check error');
+	});
+
+	test('the signed-in account is removed by value, also as a 32-bit account ID', async () => {
+		const { settings, backend } = await setup();
+		backend.status = JSON.stringify({ current_version: '0.2.0', last_error: `ids ${ACCOUNT} 39734273 [U:1:39734273]` });
+		const report = await settings.diagnosticReport();
+		expect(report).toContain('ids <steamid> <accountid> <steamid>');
 	});
 
 	test('still builds when the backend does not answer', async () => {
