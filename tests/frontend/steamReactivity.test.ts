@@ -105,6 +105,36 @@ function build(withSignal: boolean, tags: number[]) {
 }
 
 describe('live refresh of Steam-style cached lists', () => {
+	test('"only adult games" switches the cached lists and counts in place, and back', async () => {
+		const { store, lib } = build(true, [20]);
+		lib.start();
+		store.plugin = { sdShouldHide: (id) => lib.shouldHide(id) };
+		await flush();
+
+		const seen: Array<{ apps: number[]; count: number | undefined }> = [];
+		const stop = autorun(() => {
+			seen.push({ apps: store.games.visibleApps, count: store.games.GetAppCountWithToolsFilter('f') });
+		});
+		expect(seen.at(-1)).toEqual({ apps: [10, 30], count: 2 });
+
+		expect(lib.setMode('only')).toBe(true);
+		expect(seen.at(-1)).toEqual({ apps: [20], count: 1 });
+
+		await lib.tagGames([30]);
+		expect(seen.at(-1)).toEqual({ apps: [20, 30], count: 2 });
+
+		lib.setMode('all');
+		expect(seen.at(-1)).toEqual({ apps: [10, 20, 30], count: 3 });
+
+		lib.setMode('only');
+		await lib.untagGames([20, 30]); // nothing tagged: back to hidden, never an empty list
+		expect(lib.getMode()).toBe('hidden');
+		expect(seen.at(-1)).toEqual({ apps: [10, 20, 30], count: 3 });
+		expect(store.hidden.size).toBe(0);
+		stop();
+		lib.stop();
+	});
+
 	test('plugin loaded before the first compute: tags, toggle and untag update lists and counts in place', async () => {
 		const { store, lib } = build(true, [20]);
 		lib.start();

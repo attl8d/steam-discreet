@@ -525,6 +525,32 @@ Exact-name search on 1062090: in the results at baseline; tagged with the toggle
 
 So **Working and tested on the Mac:** sidebar, collections, Favorites, exact-name Library search, Recent Games and ordinary What's New entries (data and what Home renders), and Play Next (data; its rendered card not seen). **Not seen live:** takeover events (none were showing in either run, and they cannot be produced on demand; same `BIsVisible` filter as ordinary entries). Windows is still to re-confirm.
 
+## Adult only mode (read from source, live check pending)
+
+Read on 21 November 2026 from Valve's public `steamui_websrc_all.zip` for build **1794536281** (same zip and sha256 as in "M3 library hiding"). Nothing here has been seen in the running client yet.
+
+The question was whether "show only tagged games" can keep Steam's sidebar grouping and "Sort by recent activity". It can, through the existing `library-visibility` seam, with no new hook:
+
+- `uiStore.GetCollectionList()` (sp.js around offset 12.016M) picks the sidebar's source: `collectionStore.recentAppCollections` when sorted by recent activity, else `userCollections` when grouped by collection, else `[allAppsCollection]` (plus site license and shared libraries); the search view uses the app-type collections and Hidden.
+- The sidebar rows (`visibleRows`, around 12.715M) are `collection.visibleApps.filter(uiStore.currentAppFilter.Matches)` for each of them, skipping a collection with no match. So collections with no tagged game drop out while the mode is on.
+- `recentAppCollections` (around 11.823M) buckets `allRecentAppsCollection.allApps` by `rt_recent_activity_time` and wraps each bucket as a normal collection, so its `visibleApps` also goes through `BIsVisible`.
+- So making `sdShouldHide` return true for every untagged game shows only tagged games in every sidebar view, in Steam's own order and groups, and on every Library Home surface listed under "M4 full coverage".
+
+Steam's filter model was considered and rejected for this:
+
+- Filter groups are indexed (0 app type, 1 play state, 2 features, 3 genre, 4 store tags, 5 partner, 6 friends, 7 language, 8 accessibility). Play state names are `["ignored","Installed","ReadyToPlay","PlayedPreviously","Unplayed","ValidPlatform","Private"]`, and "Private" is `case L.fd: return e.tw.BIsAppPrivate(Ne.appid)`, the closest template for an "Adult" option.
+- The Library Filters panel (module 83035) renders the Play State column from a fixed list `[x.Sr,x.mI,x.zW,x.jn,x.fd]`; labels come from `"#FilterElement_"+name`.
+- `uiStore.SaveLocalState()` stores `collectionFilter: m_collectionsAppFilter.ToStorageFormat()` in Steam's local storage on every change and restores it at start, and "Save as Dynamic Collection" puts the filter into a synced collection. A real option would therefore survive restarts (against "off after every start" and "visibility state is never written to disk") and could reach other devices, and it would need four to six hooks (predicate, option list, label, summary, stripping on load and on save).
+
+The plugin side: `services/library.ts` holds a `ViewMode` (`hidden`, `all`, `only`); `only` is refused until the tags load and while none are tagged, and untagging the last game switches back to `hidden`. The `reveal-toggle` hook's slot now returns two keyed icons (the eye and "18+").
+
+| Name | Status |
+| --- | --- |
+| `uiStore.GetCollectionList`, `bIsGameListSortedByRecent`, `bIsGameListGroupedByCollection` | Source only, build 1794536281 |
+| `collectionStore.recentAppCollections` | Source only, build 1794536281 (read only by the live check script) |
+
+Live check: `scripts/live/adult-only-check.js` (with `SD_CHECK_APPID` set to a game in a user collection with recent activity). It switches the mode through the plugin only and never changes Steam's sort, grouping or filter settings.
+
 ## Settings page and diagnostic report (report path live on the Mac; page render pending)
 
 Written 21 November 2026 for T8, from Valve's public `steamui_websrc_all.zip` for build **1794536281** (same zip and hash as in "M3 library hiding"), plus the live M1 findings. No device was reachable from this session, so nothing new here has been seen in the running client yet.

@@ -6,7 +6,7 @@ import { steamLibraryPort } from './integrations/steam';
 import { readAppName, readSteamBuild } from './integrations/steam/clientInfo';
 import { tagMenuItem } from './integrations/steam/contextMenu';
 import { revealToggleSlot } from './integrations/steam/revealToggleSlot';
-import { installLibrary, LibraryService } from './services/library';
+import { installLibrary, LibraryService, parseViewMode } from './services/library';
 import { installSettings, millenniumSettingsBackend, SettingsService } from './services/settings';
 import { millenniumTagRpc, TagStorage } from './services/tagStorage';
 
@@ -41,6 +41,12 @@ export const sdLibrary = {
 	isRevealed: () => library.isRevealed(),
 	setRevealed: (on: unknown) => {
 		library.setRevealed(on === true);
+	},
+	getMode: () => library.getMode(),
+	/** Returns false if refused ("only" before the tags load or with nothing tagged). */
+	setMode: (mode: unknown) => {
+		const m = parseViewMode(mode);
+		return m !== null && library.setMode(m);
 	},
 	tagGames: (appIds: readonly number[]) => library.tagGames(appIds),
 	untagGames: (appIds: readonly number[]) => library.untagGames(appIds),

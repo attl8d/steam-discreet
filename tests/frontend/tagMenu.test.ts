@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { AppId } from '../../frontend/domain/appId';
-import { revealToggleView } from '../../frontend/domain/revealToggle';
+import { adultOnlyToggleView, revealToggleView } from '../../frontend/domain/revealToggle';
 import { decideTagMenu, failureMessage, MARK_LABEL, UNMARK_LABEL } from '../../frontend/domain/tagMenu';
 import { filterIconClasses } from '../../frontend/integrations/steam/filterIconClasses';
 import { parseSelection, selectionFromMenuApps } from '../../frontend/integrations/steam/selection';
@@ -152,21 +152,62 @@ describe('runMenuAction', () => {
 });
 
 describe('revealToggleView', () => {
+	const base = { ready: true, mode: 'hidden', hasTags: true, seamStatus: 'ok' } as const;
+
 	test('off by default and labelled for the next action', () => {
-		expect(revealToggleView({ ready: true, revealed: false, seamStatus: 'ok' })).toEqual({
+		expect(revealToggleView(base)).toEqual({
 			pressed: false,
 			disabled: false,
 			title: 'Show adult games',
 			warning: null,
+			next: 'all',
 		});
-		expect(revealToggleView({ ready: true, revealed: true, seamStatus: 'ok' }).title).toBe('Hide adult games');
+		const on = revealToggleView({ ...base, mode: 'all' });
+		expect(on.title).toBe('Hide adult games');
+		expect(on.next).toBe('hidden');
+	});
+
+	test('from "only adult games", the eye shows everything', () => {
+		const v = revealToggleView({ ...base, mode: 'only' });
+		expect(v.pressed).toBe(false);
+		expect(v.next).toBe('all');
 	});
 
 	test('disabled while loading, warning survives every state', () => {
-		const loading = revealToggleView({ ready: false, revealed: true, seamStatus: 'warning' });
+		const loading = revealToggleView({ ...base, ready: false, mode: 'all', seamStatus: 'warning' });
 		expect(loading.disabled).toBe(true);
 		expect(loading.pressed).toBe(false);
 		expect(loading.warning).not.toBeNull();
+	});
+});
+
+describe('adultOnlyToggleView', () => {
+	const base = { ready: true, mode: 'hidden', hasTags: true, seamStatus: 'ok' } as const;
+
+	test('switches to "only" and back to hidden', () => {
+		const off = adultOnlyToggleView(base);
+		expect(off).toEqual({
+			pressed: false,
+			disabled: false,
+			title: 'Show only adult games',
+			warning: null,
+			next: 'only',
+		});
+		const on = adultOnlyToggleView({ ...base, mode: 'only' });
+		expect(on.pressed).toBe(true);
+		expect(on.next).toBe('hidden');
+		expect(adultOnlyToggleView({ ...base, mode: 'all' }).next).toBe('only');
+	});
+
+	test('disabled while loading and while nothing is tagged', () => {
+		expect(adultOnlyToggleView({ ...base, ready: false }).disabled).toBe(true);
+		const empty = adultOnlyToggleView({ ...base, hasTags: false });
+		expect(empty.disabled).toBe(true);
+		expect(empty.title).toContain('mark a game as adult first');
+	});
+
+	test('the hook warning is shown on the eye only', () => {
+		expect(adultOnlyToggleView({ ...base, seamStatus: 'warning' }).warning).toBeNull();
 	});
 });
 

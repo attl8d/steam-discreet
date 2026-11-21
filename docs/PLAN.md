@@ -41,6 +41,13 @@ Tagged games are absent from:
 - Turning it off again hides them immediately, with no reload.
 - The toggle state is never saved. It is off after every Steam start, UI reload or plugin reload.
 
+### Adult only (added 21 November 2026)
+- A second icon ("18+") right after the eye shows only tagged games. Steam's grouping, "Sort by recent activity", search and filters keep working: with recent activity on, tagged games are grouped by when they were last played; with it off, they appear under their collections.
+- Library Home (Recent Games, shelves, What's New, Play Next) and dynamic collections show only tagged games too while it is on.
+- The eye and "18+" replace each other; clicking the pressed one goes back to hidden. Like the eye, it is never saved and is off after every start.
+- It never empties the Library: it is unavailable until the tags load and while nothing is tagged, and untagging the last game switches back to hidden.
+- No extra hook: it is a third state of the same visibility check (`library-visibility`), and the icon is added by the `reveal-toggle` hook.
+
 ### Settings page
 - Count, searchable tagged list, per-game removal, clear-all with confirmation.
 - Export and import of the tag list.

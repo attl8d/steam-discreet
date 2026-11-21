@@ -1,5 +1,6 @@
 import type { AccountId } from '../domain/accountId';
 import { parseAppId, type AppId } from '../domain/appId';
+import type { ViewMode } from '../domain/revealToggle';
 import type { ReactiveSignal } from '../integrations/steam/reactiveSignal';
 import { evaluateSelfCheck, type HookManifest, parseManifest, type SelfCheck } from './hookStatus';
 import type { TagSnapshot, TagStorage } from './tagStorage';
@@ -10,8 +11,15 @@ import type { TagSnapshot, TagStorage } from './tagStorage';
  *
  * - The patched `collectionStore.BIsVisible` (hook `library-visibility` in
  *   backend/hook_definitions.lua) asks `shouldHide(appid)` for every game.
- * - The toggle is a module-level flag. It is never saved, so it is off after
- *   every Steam start, UI reload or plugin reload.
+ * - The view mode is a module-level value: `hidden` (tagged games hidden, the
+ *   default), `all` (everything shown) or `only` (only tagged games shown). It
+ *   is never saved, so it is `hidden` after every Steam start, UI reload or
+ *   plugin reload.
+ * - `only` works through the same check, so Steam keeps its own grouping,
+ *   recent-activity sort, search and filters (docs/research.md, "Adult only
+ *   mode"). It never hides everything: until the tags load, or while the tag
+ *   list is empty, nothing is hidden, and emptying the list in `only` mode
+ *   switches back to `hidden`.
  * - Any failure here means "do not hide" (fail open): an exception, a
  *   non-number App ID, tags not loaded yet.
  * - On a tag or toggle change, Steam's cached lists are refreshed in place
@@ -62,10 +70,25 @@ export const realClock: Clock = {
  */
 export type SeamStatus = 'ok' | 'checking' | 'warning';
 
+/**
+ * hidden  tagged games are hidden (the default after every start).
+ * all     every game is shown.
+ * only    only tagged games are shown.
+ */
+export type { ViewMode };
+
+export function parseViewMode(value: unknown): ViewMode | null {
+	return value === 'hidden' || value === 'all' || value === 'only' ? value : null;
+}
+
 export interface LibraryState {
 	/** The active account's tags are loaded. */
 	readonly ready: boolean;
+	readonly mode: ViewMode;
+	/** True when tagged games are shown: mode `all` or `only`. */
 	readonly revealed: boolean;
+	/** At least one game is tagged; `only` mode is offered only then. */
+	readonly hasTags: boolean;
 	readonly seamStatus: SeamStatus;
 	/** Why seamStatus is "warning", or why tags cannot be changed, in words for the user. */
 	readonly warning: string | null;
@@ -103,7 +126,7 @@ export class LibraryError extends Error {
 }
 
 export class LibraryService {
-	private revealed = false;
+	private mode: ViewMode = 'hidden';
 	private snapshot: TagSnapshot;
 	private signal: ReactiveSignal | null = null;
 	private account: AccountId | null = null;
@@ -139,6 +162,8 @@ export class LibraryService {
 			const before = this.snapshot.tags;
 			this.snapshot = next;
 			const changed = !sameSet(before, next.tags);
+			// "Only tagged" with no tags left would be an empty Library.
+			if (changed && this.mode === 'only' && next.tags.size === 0) this.mode = 'hidden';
 			if (changed) this.refreshSteam();
 			this.emit(changed);
 		});
@@ -171,10 +196,13 @@ export class LibraryService {
 		try {
 			// Read first, unconditionally, so every list depends on the signal.
 			this.signal?.read();
-			if (this.revealed) return false;
+			if (this.mode === 'all') return false;
 			if (this.uiHookProblems().reveal !== null) return false;
 			const id = parseAppId(appId);
-			return id !== null && this.snapshot.tags.has(id);
+			if (id === null) return false;
+			const tags = this.snapshot.tags;
+			if (this.mode === 'only') return this.isReady() && tags.size > 0 && !tags.has(id);
+			return tags.has(id);
 		} catch {
 			return false;
 		}
@@ -186,14 +214,29 @@ export class LibraryService {
 	}
 
 	isRevealed(): boolean {
-		return this.revealed;
+		return this.mode !== 'hidden';
 	}
 
+	/** On shows every game (mode `all`); off hides tagged games again. */
 	setRevealed(on: boolean): void {
-		if (this.revealed === on) return;
-		this.revealed = on;
+		this.setMode(on ? 'all' : 'hidden');
+	}
+
+	getMode(): ViewMode {
+		return this.mode;
+	}
+
+	/**
+	 * Switches the view mode. `only` is refused (returns false) until the tags
+	 * are loaded and at least one game is tagged, so the Library is never blank.
+	 */
+	setMode(mode: ViewMode): boolean {
+		if (mode === 'only' && !(this.isReady() && this.snapshot.tags.size > 0)) return false;
+		if (this.mode === mode) return true;
+		this.mode = mode;
 		this.refreshSteam();
 		this.emit();
+		return true;
 	}
 
 	tagGames(appIds: readonly number[]): Promise<void> {
@@ -319,7 +362,8 @@ export class LibraryService {
 		const { seamStatus, warning: seamWarning } = this.seamState();
 		let warning = this.loadError ?? seamWarning;
 		if (warning === null && ready && !this.snapshot.writable) warning = this.snapshot.reason;
-		return { ready, revealed: this.revealed, seamStatus, warning };
+		const hasTags = ready && this.snapshot.tags.size > 0;
+		return { ready, mode: this.mode, revealed: this.mode !== 'hidden', hasTags, seamStatus, warning };
 	}
 
 	/**
@@ -401,7 +445,8 @@ export class LibraryService {
 		this.lastState = next;
 		const same =
 			prev.ready === next.ready &&
-			prev.revealed === next.revealed &&
+			prev.mode === next.mode &&
+			prev.hasTags === next.hasTags &&
 			prev.seamStatus === next.seamStatus &&
 			prev.warning === next.warning;
 		if (same && !force) return;
@@ -457,7 +502,18 @@ export function isRevealed(): boolean {
 	return instance?.isRevealed() ?? false;
 }
 
-const NOT_LOADED: LibraryState = { ready: false, revealed: false, seamStatus: 'checking', warning: null };
+export function setMode(mode: ViewMode): boolean {
+	return instance?.setMode(mode) ?? false;
+}
+
+const NOT_LOADED: LibraryState = {
+	ready: false,
+	mode: 'hidden',
+	revealed: false,
+	hasTags: false,
+	seamStatus: 'checking',
+	warning: null,
+};
 
 export function getState(): LibraryState {
 	return instance?.getState() ?? NOT_LOADED;
