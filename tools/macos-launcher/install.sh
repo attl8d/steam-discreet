@@ -19,14 +19,23 @@ valve_id="com.valvesoftware.steam"
 lsregister="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 
 [ "$(uname -s)" = "Darwin" ] || { echo "macOS only" >&2; exit 1; }
+case "$(cd "$(dirname "$launcher")" 2>/dev/null && pwd -P)/Steam.app" in
+    "$valve_app")
+        echo "refusing to install into $dest: that is where Valve's Steam.app lives" >&2
+        exit 1
+        ;;
+esac
 
 # Sets the default app for the steam:// scheme. LSSetDefaultHandlerForURLScheme
 # is deprecated but still the only call that sets a scheme handler without UI.
+# Reads the handler back afterwards and fails unless it is the one asked for.
 set_handler() {
-    local rc
+    local rc now
     rc="$(osascript -l JavaScript -e "ObjC.import('CoreServices'); \$.LSSetDefaultHandlerForURLScheme(\$('steam'), \$('$1'))")"
-    if [ "$rc" != "0" ]; then
-        echo "could not set the steam:// handler to $1 (OSStatus $rc)" >&2
+    now="$(current_handler)"
+    # LaunchServices may report the bundle id in another case.
+    if [ "$rc" != "0" ] || [ "$(printf '%s' "$now" | tr '[:upper:]' '[:lower:]')" != "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" ]; then
+        echo "could not set the steam:// handler to $1 (OSStatus $rc, handler now $now)" >&2
         return 1
     fi
 }
@@ -43,11 +52,27 @@ status() {
     echo "log: $HOME/Library/Logs/SteamLauncher.log"
 }
 
+# Our own bundle id, or empty when the path holds something else.
+bundle_id() { defaults read "$1/Contents/Info" CFBundleIdentifier 2>/dev/null || true; }
+
+# Removes an app only if it is one of ours; stops otherwise.
+remove_ours() {
+    local app="$1" id="$2" found
+    [ -e "$app" ] || return 0
+    found="$(bundle_id "$app")"
+    if [ "$found" != "$id" ]; then
+        echo "refusing to remove $app: bundle id is '${found:-none}', not $id" >&2
+        exit 1
+    fi
+    "$lsregister" -u "$app" 2>/dev/null || true
+    rm -rf "$app"
+}
+
 build_app() {
     local source="$1" app="$2" id="$3" url_scheme="$4"
     local plist="$app/Contents/Info.plist"
 
-    rm -rf "$app"
+    remove_ours "$app" "$id"
     osacompile -o "$app" "$source"
     install -m 0755 "$here/launch.sh" "$app/Contents/Resources/launch.sh"
 
@@ -57,6 +82,9 @@ build_app() {
     icon="${icon%.icns}"
     if [ -n "$icon" ] && [ -f "$valve_app/Contents/Resources/$icon.icns" ]; then
         cp "$valve_app/Contents/Resources/$icon.icns" "$app/Contents/Resources/applet.icns"
+        # An asset-catalog icon would take precedence over applet.icns.
+        /usr/libexec/PlistBuddy -c "Delete :CFBundleIconName" "$plist" 2>/dev/null || true
+        rm -f "$app/Contents/Resources/Assets.car"
     fi
 
     /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $id" "$plist" 2>/dev/null \
@@ -84,9 +112,9 @@ case "${1:-}" in
         exit 0
         ;;
     --uninstall)
-        set_handler "$valve_id"
-        rm -rf "$launcher" "$plain"
-        "$lsregister" -f "$valve_app" 2>/dev/null || true
+        set_handler "$valve_id" || echo "warning: steam:// may still point at the launcher until Steam.app is opened once" >&2
+        remove_ours "$launcher" "$launcher_id"
+        remove_ours "$plain" "$plain_id"
         echo "Removed the launcher apps; steam:// opens Steam.app again."
         status
         exit 0

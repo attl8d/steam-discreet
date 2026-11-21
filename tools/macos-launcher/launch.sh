@@ -12,8 +12,8 @@ url="${2:-}"
 valve_id="com.valvesoftware.steam"
 wrapper_id="com.steamhomebrew.millennium.wrapper"
 log="$HOME/Library/Logs/SteamLauncher.log"
-# Seconds to wait for Steam Millennium to keep running before falling back.
-grace="${STEAM_LAUNCHER_GRACE:-15}"
+# Seconds to wait for Steam Millennium to start before falling back.
+grace="${STEAM_LAUNCHER_GRACE:-20}"
 
 say() { printf '%s %s\n' "$(date '+%F %T')" "$*" >>"$log"; }
 
@@ -38,23 +38,23 @@ steam_running() { pgrep -x steam_osx >/dev/null 2>&1; }
 # lists it under the wrapper's bundle id while Steam Millennium runs.
 wrapper_running() { lsappinfo info -only pid -app "$wrapper_id" 2>/dev/null | grep -q '[0-9]'; }
 
-open_plain() {
-    say "plain: open -b $valve_id ${url}"
+# Sends a link, or just activates, through the given bundle id.
+open_with() {
+    say "open -b $1 ${url}"
     if [ -n "$url" ]; then
-        open -b "$valve_id" "$url"
+        open -b "$1" "$url"
     else
-        open -b "$valve_id"
+        open -b "$1"
     fi
 }
 
+open_plain() { open_with "$valve_id"; }
+
 if steam_running; then
-    # Steam is already up (with or without Millennium): hand over the link or
-    # bring it to the front the same way Steam.app would.
-    if [ -n "$url" ]; then
-        open_plain
-    elif wrapper_running; then
-        say "running under Millennium: activate"
-        open -b "$wrapper_id"
+    # Steam is already up: hand the link (or the activation) to the app that
+    # LaunchServices lists it under, so no second bootstrapper starts.
+    if wrapper_running; then
+        open_with "$wrapper_id"
     else
         open_plain
     fi
@@ -81,16 +81,25 @@ else
 fi
 
 # The wrapper exits with an error before starting Steam when its runtime is
-# missing or broken. Steam itself can restart once while it updates, so only
-# fall back if nothing is running at two checks a few seconds apart.
-sleep "$grace"
-if ! steam_running; then
-    sleep 5
-    if ! steam_running; then
-        say "Steam Millennium did not start within $((grace + 5)) s, starting plain Steam"
-        notify "Steam Millennium did not start. Starting Steam without Millennium."
-        open_plain
-        exit 0
+# missing or broken. Count Steam as started once steam_osx has been up for
+# 3 s in a row, so a quick quit or an update restart does not count as failure.
+up=0
+for _ in $(seq 1 "$grace"); do
+    sleep 1
+    if steam_running; then
+        up=$((up + 1))
+        if [ "$up" -ge 3 ]; then
+            say "Steam Millennium running"
+            exit 0
+        fi
+    else
+        up=0
     fi
+done
+if steam_running; then
+    say "Steam Millennium still starting after $grace s, leaving it"
+    exit 0
 fi
-say "Steam Millennium running"
+say "Steam Millennium did not start within $grace s, starting plain Steam"
+notify "Steam Millennium did not start. Starting Steam without Millennium."
+open_plain
