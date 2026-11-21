@@ -98,6 +98,7 @@ function build(withSignal: boolean, tags: number[]) {
 		createSignal: () => (withSignal ? signalFromObservable(observable) : null),
 		clearCounts: () => clearCollectionCounts(root),
 		seenHooks: () => new Set(),
+		hookManifest: () => Promise.resolve(null),
 	};
 	const lib = new LibraryService(new TagStorage(rpc(tags)), port, clock);
 	return { store, lib };
@@ -133,6 +134,56 @@ describe('live refresh of Steam-style cached lists', () => {
 		// Steam's own Hidden state is never touched.
 		expect(store.hidden.size).toBe(0);
 		stop();
+	});
+
+	test('an observer that reads only a count stays current over several changes', async () => {
+		const { store, lib } = build(true, []);
+		lib.start();
+		store.plugin = { sdShouldHide: (id) => lib.shouldHide(id) };
+		await flush();
+		let count: number | undefined;
+		let runs = 0;
+		const stop = autorun(() => {
+			runs += 1;
+			count = store.games.GetAppCountWithToolsFilter('f');
+		});
+		expect(count).toBe(3);
+		await lib.tagGames([10]);
+		expect(count).toBe(2);
+		await lib.tagGames([20]);
+		expect(count).toBe(1);
+		lib.setRevealed(true);
+		expect(count).toBe(3);
+		lib.setRevealed(false);
+		await lib.untagGames([10, 20]);
+		expect(count).toBe(3);
+		expect(runs).toBeGreaterThan(4);
+		stop();
+	});
+
+	test('KNOWN GAP: a second count-only reader of the same cache misses updates', async () => {
+		// The first reader after ClearAppCounts recomputes (and so depends on the
+		// signal); a second reader of the same collection and filter gets the
+		// cached number, depends on nothing of ours, and stays stale. Recorded in
+		// docs/research.md (M3) for the live check. If Steam shows it, the fix is
+		// a hook on GetAppCountWithToolsFilter that reads the signal on a hit.
+		const { store, lib } = build(true, []);
+		lib.start();
+		store.plugin = { sdShouldHide: (id) => lib.shouldHide(id) };
+		await flush();
+		let a: number | undefined;
+		let b: number | undefined;
+		const stopA = autorun(() => {
+			a = store.games.GetAppCountWithToolsFilter('f');
+		});
+		const stopB = autorun(() => {
+			b = store.games.GetAppCountWithToolsFilter('f');
+		});
+		await lib.tagGames([10]);
+		expect(a).toBe(2);
+		expect(b).toBe(3); // stale: documents the gap
+		stopA();
+		stopB();
 	});
 
 	test('without the signal the cached list stays stale (the M1 finding this fixes)', async () => {

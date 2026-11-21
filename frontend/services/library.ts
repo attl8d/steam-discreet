@@ -1,6 +1,7 @@
 import type { AccountId } from '../domain/accountId';
 import { parseAppId, type AppId } from '../domain/appId';
 import type { ReactiveSignal } from '../integrations/steam/reactiveSignal';
+import { evaluateSelfCheck, type HookManifest, parseManifest } from './hookStatus';
 import type { TagSnapshot, TagStorage } from './tagStorage';
 
 /**
@@ -32,6 +33,8 @@ export interface LibraryPort {
 	clearCounts(): number;
 	/** Hook ids whose patched code has run. */
 	seenHooks(): ReadonlySet<string>;
+	/** The backend's hook manifest (`steam_discreet_hook_manifest`): a JSON string or object, untrusted. */
+	hookManifest(): Promise<unknown>;
 }
 
 export interface Clock {
@@ -69,7 +72,21 @@ export interface LibraryOptions {
 	readonly pollMs?: number;
 	/** How long after start an unseen hook counts as "checking" rather than "warning". */
 	readonly graceMs?: number;
+	/** First retry delay after the account's tags failed to load; doubles up to `maxRetryMs`. */
+	readonly retryMs?: number;
+	readonly maxRetryMs?: number;
 }
+
+/**
+ * Used until the backend's manifest arrives, or if it cannot be read: the
+ * library hook as backend/hook_definitions.lua declares it.
+ */
+const FALLBACK_MANIFEST: HookManifest = {
+	version: 1,
+	expected: [{ id: VISIBILITY_HOOK_ID, description: '', runs: 'startup', file: '', find: '' }],
+	rejected: [],
+	error: null,
+};
 
 export class LibraryError extends Error {
 	constructor(
@@ -89,6 +106,13 @@ export class LibraryService {
 	private hookSeen = false;
 	private startedAt = 0;
 	private started = false;
+	private manifest: HookManifest | null = null;
+	private opening = false;
+	private openFailures = 0;
+	private nextOpenAt = 0;
+	private loadError: string | null = null;
+	private readonly retryMs: number;
+	private readonly maxRetryMs: number;
 	private timer: unknown = null;
 	private readonly listeners = new Set<() => void>();
 	private readonly pollMs: number;
@@ -103,6 +127,8 @@ export class LibraryService {
 	) {
 		this.pollMs = options.pollMs ?? 1000;
 		this.graceMs = options.graceMs ?? 60_000;
+		this.retryMs = options.retryMs ?? 2000;
+		this.maxRetryMs = options.maxRetryMs ?? 60_000;
 		this.snapshot = storage.snapshot;
 		this.lastState = this.computeState();
 		storage.subscribe((next) => {
@@ -120,6 +146,7 @@ export class LibraryService {
 		this.startedAt = this.clock.now();
 		this.started = true;
 		this.signal = safely(() => this.port.createSignal(), null);
+		void this.loadManifest();
 		this.tick();
 		this.timer = this.clock.setInterval(() => {
 			this.tick();
@@ -211,11 +238,57 @@ export class LibraryService {
 		const account = safely(() => this.port.currentAccount(), null);
 		if (account !== null && account !== this.account) {
 			this.account = account;
-			void this.storage.open(account);
+			this.openFailures = 0;
+			this.nextOpenAt = 0;
+			this.loadError = null;
+		}
+		if (this.account !== null && !this.isReady() && !this.opening && this.clock.now() >= this.nextOpenAt) {
+			void this.openAccount(this.account);
 		}
 		if (!this.hookSeen) {
 			this.hookSeen = safely(() => this.port.seenHooks().has(VISIBILITY_HOOK_ID), false);
 		}
+		this.emit();
+	}
+
+	/**
+	 * Opens the account's tag file. While it has not loaded (the call failed or
+	 * the reply was unusable), later ticks retry with a doubling delay, and the
+	 * state carries a warning: tagged games are visible until it loads.
+	 */
+	private async openAccount(account: AccountId): Promise<void> {
+		this.opening = true;
+		let message: string | null = null;
+		try {
+			const result = await this.storage.open(account);
+			if (!result.ok) message = result.message;
+		} catch (error) {
+			message = error instanceof Error ? error.message : String(error);
+		} finally {
+			this.opening = false;
+		}
+		if (account !== this.account) return;
+		if (this.isReady()) {
+			this.openFailures = 0;
+			this.loadError = null;
+		} else {
+			this.openFailures += 1;
+			const delay = Math.min(this.retryMs * 2 ** (this.openFailures - 1), this.maxRetryMs);
+			this.nextOpenAt = this.clock.now() + delay;
+			this.loadError = `Tags could not be loaded, so tagged games are visible (${message ?? 'no usable reply'}). Retrying.`;
+		}
+		this.emit();
+	}
+
+	private async loadManifest(): Promise<void> {
+		let raw: unknown;
+		try {
+			raw = await this.port.hookManifest();
+			if (typeof raw === 'string') raw = JSON.parse(raw) as unknown;
+		} catch {
+			return; // keep the fallback
+		}
+		this.manifest = parseManifest(raw);
 		this.emit();
 	}
 
@@ -229,23 +302,43 @@ export class LibraryService {
 
 	private computeState(): LibraryState {
 		const ready = this.isReady();
-		let seamStatus: SeamStatus;
-		let warning: string | null = null;
-		if (this.hookSeen) {
-			if (this.signal === null && this.started) {
-				seamStatus = 'warning';
-				warning = 'Hiding works, but the Library refreshes only after a Steam restart.';
-			} else {
-				seamStatus = 'ok';
-			}
-		} else if (!this.started || this.clock.now() - this.startedAt < this.graceMs) {
-			seamStatus = 'checking';
-		} else {
-			seamStatus = 'warning';
-			warning = 'The Library hook did not attach. Tagged games are visible.';
-		}
+		const { seamStatus, warning: seamWarning } = this.seamState();
+		let warning = this.loadError ?? seamWarning;
 		if (warning === null && ready && !this.snapshot.writable) warning = this.snapshot.reason;
 		return { ready, revealed: this.revealed, seamStatus, warning };
+	}
+
+	/** The library hook's state, from the backend manifest and the marker (services/hookStatus.ts). */
+	private seamState(): { seamStatus: SeamStatus; warning: string | null } {
+		const manifest = this.manifest ?? FALLBACK_MANIFEST;
+		const seen = this.hookSeen ? new Set([VISIBILITY_HOOK_ID]) : new Set<string>();
+		const graceOver = this.started && this.clock.now() - this.startedAt >= this.graceMs;
+		const check = evaluateSelfCheck(manifest, seen, graceOver);
+		const hook = check.hooks.find((h) => h.id === VISIBILITY_HOOK_ID);
+		if (hook === undefined) {
+			const why = check.loadError ?? 'it is not in the plugin\'s hook list';
+			return { seamStatus: 'warning', warning: `The Library hook is off (${why}). Tagged games are visible.` };
+		}
+		switch (hook.state) {
+			case 'attached':
+				if (this.signal === null && this.started) {
+					return {
+						seamStatus: 'warning',
+						warning: 'Hiding works, but the Library refreshes only after a Steam restart.',
+					};
+				}
+				return { seamStatus: 'ok', warning: null };
+			case 'rejected':
+				return {
+					seamStatus: 'warning',
+					warning: `The Library hook was rejected (${hook.reason ?? 'invalid definition'}). Tagged games are visible.`,
+				};
+			case 'missing':
+				return { seamStatus: 'warning', warning: 'The Library hook did not attach. Tagged games are visible.' };
+			case 'checking':
+			case 'not-seen':
+				return { seamStatus: 'checking', warning: null };
+		}
 	}
 
 	/** Notifies listeners when the state changed, or always when `force` (the tag set changed). */
