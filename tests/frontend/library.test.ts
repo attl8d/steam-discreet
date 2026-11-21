@@ -236,6 +236,90 @@ describe('refreshing Steam', () => {
 	});
 });
 
+describe('adult only mode', () => {
+	test('shows only tagged games, and the mode is never saved', async () => {
+		const { lib, backend } = await setup([570, 440]);
+		expect(lib.getMode()).toBe('hidden');
+		expect(lib.setMode('only')).toBe(true);
+		expect(lib.getMode()).toBe('only');
+		expect(lib.isRevealed()).toBe(true);
+		expect(lib.getState()).toMatchObject({ mode: 'only', revealed: true, hasTags: true });
+		expect(lib.shouldHide(570)).toBe(false);
+		expect(lib.shouldHide(440)).toBe(false);
+		expect(lib.shouldHide(730)).toBe(true);
+		lib.setMode('hidden');
+		expect(lib.shouldHide(570)).toBe(true);
+		expect(lib.shouldHide(730)).toBe(false);
+		expect(backend.calls.filter((c) => c !== 'open' && !c.startsWith('account:'))).toEqual([]);
+	});
+
+	test('the eye and the "only" mode replace each other', async () => {
+		const { lib } = await setup([570]);
+		lib.setMode('only');
+		lib.setRevealed(true);
+		expect(lib.getMode()).toBe('all');
+		expect(lib.shouldHide(730)).toBe(false);
+		lib.setMode('only');
+		lib.setRevealed(false);
+		expect(lib.getMode()).toBe('hidden');
+	});
+
+	test('a mode change refreshes Steam once', async () => {
+		const { lib, port } = await setup([570]);
+		port.events.length = 0;
+		lib.setMode('only');
+		lib.setMode('only');
+		expect(port.events).toEqual(['clearCounts', 'bump']);
+	});
+
+	test('refused before the tags load and while nothing is tagged', async () => {
+		const empty = await setup();
+		expect(empty.lib.getState().hasTags).toBe(false);
+		expect(empty.lib.setMode('only')).toBe(false);
+		expect(empty.lib.getMode()).toBe('hidden');
+		expect(empty.lib.shouldHide(730)).toBe(false);
+
+		const backend = new Backend();
+		backend.tags.add(570);
+		const port = new FakePort();
+		port.account = null;
+		const lib = new LibraryService(new TagStorage(backend), port, new FakeClock());
+		lib.start();
+		expect(lib.setMode('only')).toBe(false);
+		expect(lib.shouldHide(730)).toBe(false);
+		lib.stop();
+	});
+
+	test('untagging the last game in "only" mode switches back to hidden, never to a blank Library', async () => {
+		const { lib, port } = await setup([570]);
+		lib.setMode('only');
+		port.events.length = 0;
+		await lib.untagGames([570]);
+		expect(lib.getMode()).toBe('hidden');
+		expect(lib.shouldHide(730)).toBe(false);
+		expect(lib.shouldHide(570)).toBe(false);
+		expect(port.events).toEqual(['clearCounts', 'bump']);
+	});
+
+	test('a newly tagged game shows at once in "only" mode; an untagged one leaves', async () => {
+		const { lib } = await setup([570, 440]);
+		lib.setMode('only');
+		await lib.tagGames([730]);
+		expect(lib.shouldHide(730)).toBe(false);
+		await lib.untagGames([440]);
+		expect(lib.shouldHide(440)).toBe(true);
+		expect(lib.getMode()).toBe('only');
+	});
+
+	test('fails open on bad input', async () => {
+		const { lib } = await setup([570]);
+		lib.setMode('only');
+		for (const bad of [null, undefined, {}, -1, 1.5, Number.NaN]) {
+			expect(lib.shouldHide(bad)).toBe(false);
+		}
+	});
+});
+
 describe('tagging', () => {
 	test('tagGames rejects when the save fails, and nothing is shown as tagged', async () => {
 		const { lib, backend } = await setup();
@@ -304,6 +388,17 @@ describe('account', () => {
 		expect(lib.shouldHide(570)).toBe(true);
 		clock.advance(1000);
 		expect(backend.calls.filter((c) => c === 'open').length).toBe(1);
+	});
+
+	test('switching account resets the view to hidden and refreshes Steam', async () => {
+		const { lib, port, clock } = await setup([570]);
+		lib.setMode('only');
+		port.events.length = 0;
+		port.account = parseAccountId('76561198000000002') as AccountId;
+		clock.advance(1000);
+		expect(lib.getMode()).toBe('hidden');
+		expect(port.events.slice(0, 2)).toEqual(['clearCounts', 'bump']);
+		await flush();
 	});
 });
 
@@ -464,6 +559,17 @@ describe('UI hooks from the backend manifest', () => {
 		expect(lib.getState().seamStatus).toBe('warning');
 		expect(lib.getState().warning).toContain('toggle hook is off (rejected (bad regex))');
 		expect(port.events).toContain('bump');
+		lib.stop();
+	});
+
+	test('a rejected reveal toggle also turns "only" mode off (fail open)', async () => {
+		const { lib } = await withManifest({
+			version: 1,
+			expected: expected(VISIBILITY_HOOK_ID, MENU_HOOK_ID),
+			rejected: [{ id: REVEAL_HOOK_ID, reason: 'bad regex' }],
+		});
+		lib.setMode('only');
+		expect(lib.shouldHide(730)).toBe(false);
 		lib.stop();
 	});
 

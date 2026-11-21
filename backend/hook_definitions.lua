@@ -65,7 +65,8 @@ return {
             runs = "on_demand",
             description = "The Library sidebar header in sp.js: the row of icon filters under the Games dropdown "
                 .. "(ViewFiltersBar > Filters, next to sort-by-recent and ready-to-play). The patch adds Steam Discreet's "
-                .. "show/hide adult games toggle as the first icon, styled with Steam's own CheckboxWithImage classes. "
+                .. "show/hide adult games eye and the show-only-adult-games icon (18+) as the first icons, "
+                .. "styled with Steam's own CheckboxWithImage classes. "
                 .. "Seen on Steam build 1794536281.",
             file = [=[(^|[\\/])sp\.js([?]|$)]=],
             find = [=[\(0,[A-Za-z_$][A-Za-z0-9_$]*\.jsx\)\("div",\{className:[A-Za-z_$][A-Za-z0-9_$]*\(\)\.ViewFiltersBar,children:\(0,[A-Za-z_$][A-Za-z0-9_$]*\.jsxs\)\("div",\{className:\(0,[A-Za-z_$][A-Za-z0-9_$]*\.A\)\([A-Za-z_$][A-Za-z0-9_$]*\(\)\.Filters,[A-Za-z_$][A-Za-z0-9_$]*&&[A-Za-z_$][A-Za-z0-9_$]*\(\)\.Disabled\),children:\[]=],

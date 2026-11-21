@@ -13,7 +13,7 @@ import {
 	restoreQuestion,
 } from '../services/backupFiles';
 import type { HookState } from '../services/hookStatus';
-import { getState, setRevealed, subscribe } from '../services/library';
+import { getState, setMode, subscribe } from '../services/library';
 import { type ActionResult, installedSettings, type SettingsService, type SettingsView } from '../services/settings';
 
 /**
@@ -91,7 +91,7 @@ export function SettingsContent() {
 	);
 }
 
-/** The switch is the way to reveal tagged games when the sidebar toggle does not appear. */
+/** The switches are the way to change the view when the sidebar icons do not appear. */
 function RevealSection() {
 	const state = useSyncExternalStore(subscribe, getState);
 	return (
@@ -99,10 +99,19 @@ function RevealSection() {
 			<ToggleField
 				label="Show adult games"
 				description="Same as the eye icon in the Library sidebar. Off again after every Steam start."
-				checked={state.revealed}
+				checked={state.mode === 'all'}
 				disabled={!state.ready}
 				onChange={(on) => {
-					setRevealed(on);
+					setMode(on ? 'all' : 'hidden');
+				}}
+			/>
+			<ToggleField
+				label="Show only adult games"
+				description="Same as the 18+ icon in the Library sidebar: only tagged games, in their usual collections or by recent activity. Off again after every Steam start."
+				checked={state.mode === 'only'}
+				disabled={!state.ready || (state.mode !== 'only' && !state.hasTags)}
+				onChange={(on) => {
+					setMode(on ? 'only' : 'hidden');
 				}}
 			/>
 			<Field label="Status" description={state.warning ?? STATUS[state.seamStatus]} />

@@ -387,6 +387,7 @@ From `sp.js` module 59671 (CollectionStore):
 - Steam's mobx is webpack module `89193` in `libraries~00299a408.js` (mobx 6; export `sH` is `observable`, `EW` is `computed`). The plugin finds `observable` by shape (a function with `box` and `array`), as M1 did live, never by the minified name.
 - Steam calls `configure({enforceActions:"never"})` (module `K=t(89193)`, `(0,K.jK)({enforceActions:"never"})`), so setting the box outside an action is allowed.
 - Counts are cached separately: `GetAppCountWithToolsFilter(filter)` stores results in a plain `Map` (`m_mapFilterToAppCounts`), emptied only by `ClearAppCounts()`. Steam calls it itself when membership changes. The plugin calls `ClearAppCounts()` on every reachable collection before bumping the box. It clears a cache of numbers; it changes no collection, Hidden or Private state.
+- **Not before Steam has loaded its collections** (found live on the Mac, 21 November 2026, build 1794536281): `collectionStore.m_mapCollectionsFromStorage` is a plain field, undefined until the first cloud-storage change, and `userCollections` is a keepAlive computed over it. Reading it earlier throws, and because it read no observable first, mobx caches that error permanently: every later read by Steam throws too, until the UI reloads. It happened when a tag change cleared counts right after a Steam restart. `clearCollectionCounts` now returns at once while `collectionsFromStorage` is not a map, as Steam's own `OnAppOverviewChange` does.
 - The collections reached: `GetCollection(id)` for the built-in ids that `GetCollection` resolves (listed in `frontend/integrations/steam/collectionCounts.ts`), `userCollections` and `collectionsFromStorage`.
 - Timing: Millennium appends plugin frontends once `App.BFinishedInitBeforeLogin()` is true (`src/typescript/sdk/src/index.ts` `startClient`, Millennium `ca8976d`), i.e. before login and before the Library has app data. The plugin creates the box when its module loads, so lists computed after that depend on it. A list computed before the plugin loaded would not refresh until Steam recomputes it; the live check shows whether that happens.
 - `tests/frontend/steamReactivity.test.ts` models this with real mobx 6: keepAlive `visibleApps`, the count Map and an autorun "sidebar". It shows the lists and counts update on tag, reveal, hide and untag, and that without the box they stay stale (the M1 result).
@@ -524,6 +525,44 @@ Third run with the script at `26b8f7c` (output on `live-out/m4-probe` at `a5201e
 Exact-name search on 1062090: in the results at baseline; tagged with the toggle off, not found and 0 images and labels in both areas; toggle on, found (sidebar 1/1); off again, not found; untagged, found. While the search is active the recorded filter has empty filter groups (the Games and Installed options cleared, only the search text set). That is Steam's own behaviour: `uiStore.SetSearchText` starts a text search with a new empty filter (`this.m_currentAppFilter=new u.E6`), and clearing it (`ResetSearch`) restores `collectionsAppFilter`, which the run confirmed (back to the Games and Installed options). Clearing also clears the sidebar selection and collapses the Hidden section, as when a user clears the search.
 
 So **Working and tested on the Mac:** sidebar, collections, Favorites, exact-name Library search, Recent Games and ordinary What's New entries (data and what Home renders), and Play Next (data; its rendered card not seen). **Not seen live:** takeover events (none were showing in either run, and they cannot be produced on demand; same `BIsVisible` filter as ordinary entries). Windows is still to re-confirm.
+
+## Adult only mode (read from source, live check pending)
+
+Read on 21 November 2026 from Valve's public `steamui_websrc_all.zip` for build **1794536281** (same zip and sha256 as in "M3 library hiding"). Nothing here has been seen in the running client yet.
+
+The question was whether "show only tagged games" can keep Steam's sidebar grouping and "Sort by recent activity". It can, through the existing `library-visibility` seam, with no new hook:
+
+- `uiStore.GetCollectionList()` (sp.js around offset 12.016M) picks the sidebar's source: `collectionStore.recentAppCollections` when sorted by recent activity, else `userCollections` when grouped by collection, else `[allAppsCollection]` (plus site license and shared libraries); the search view uses the app-type collections and Hidden.
+- The sidebar rows (`visibleRows`, around 12.715M) are `collection.visibleApps.filter(uiStore.currentAppFilter.Matches)` for each of them, skipping a collection with no match. So collections with no tagged game drop out while the mode is on.
+- `recentAppCollections` (around 11.823M) buckets `allRecentAppsCollection.allApps` by `rt_recent_activity_time` and wraps each bucket as a normal collection, so its `visibleApps` also goes through `BIsVisible`.
+- So making `sdShouldHide` return true for every untagged game shows only tagged games in every sidebar view, in Steam's own order and groups, and on every Library Home surface listed under "M4 full coverage".
+
+Steam's filter model was considered and rejected for this:
+
+- Filter groups are indexed (0 app type, 1 play state, 2 features, 3 genre, 4 store tags, 5 partner, 6 friends, 7 language, 8 accessibility). Play state names are `["ignored","Installed","ReadyToPlay","PlayedPreviously","Unplayed","ValidPlatform","Private"]`, and "Private" is `case L.fd: return e.tw.BIsAppPrivate(Ne.appid)`, the closest template for an "Adult" option.
+- The Library Filters panel (module 83035) renders the Play State column from a fixed list `[x.Sr,x.mI,x.zW,x.jn,x.fd]`; labels come from `"#FilterElement_"+name`.
+- `uiStore.SaveLocalState()` stores `collectionFilter: m_collectionsAppFilter.ToStorageFormat()` in Steam's local storage on every change and restores it at start, and "Save as Dynamic Collection" puts the filter into a synced collection. A real option would therefore survive restarts (against "off after every start" and "visibility state is never written to disk") and could reach other devices, and it would need four to six hooks (predicate, option list, label, summary, stripping on load and on save).
+
+The plugin side: `services/library.ts` holds a `ViewMode` (`hidden`, `all`, `only`); `only` is refused until the tags load and while none are tagged, and untagging the last game switches back to `hidden`. The `reveal-toggle` hook's slot now returns two keyed icons (the eye and "18+").
+
+| Name | Status |
+| --- | --- |
+| `uiStore.GetCollectionList`, `bIsGameListSortedByRecent`, `bIsGameListGroupedByCollection` | Source only, build 1794536281 |
+| `collectionStore.recentAppCollections`, `appTypeCollections`, `sharedLibrariesCollections` | Source only, build 1794536281. Each is a keepAlive computed whose group collections live on with their own count caches, so `clearCollectionCounts` clears them too (otherwise recent-activity headers keep counts like "This week (2/14)" after a mode change). |
+| `collectionStore.allAppsCollection` (`all-apps-alpha`), `uiStore.currentAppFilter` | Source only, build 1794536281 (live check script) |
+
+Live check: `scripts/live/adult-only-check.js` (with `SD_CHECK_APPID` set to a game in a user collection with recent activity). It switches the mode through the plugin only and never changes Steam's sort, grouping or filter settings.
+
+Live run, 21 November 2026, Mac client, build 1794536281, plugin at `21ca2f9` (output: branch `live-out/m4-probe` at `37b87b0`, `live-out/adult-only-check.json`), sidebar grouped by collection, not sorted by recent activity, with 98 games already tagged: `ok: true`.
+
+| Step | All visible | Untagged games in All, collection groups and recent-activity groups | Test game | Header counts | 18+ icon |
+| --- | --- | --- | --- | --- | --- |
+| Start (hidden) | 104 | n/a | visible | n/a | not pressed |
+| Adult only (test game tagged) | 99 (98 tags + the test game) | 0 | listed in Favorites, its user collection and the "Recent" group | none stale | pressed, right after the eye (5 icons in the row) |
+| Back to hidden | 103 | all shown again | hidden (still tagged) | none stale | not pressed |
+| End (untagged) | 104 | n/a | visible | n/a | not pressed |
+
+Native Hidden, Favorites and the filter state were unchanged at every step, and the 98 existing tags were the same before and after. An earlier run at `35d9e09` right after a Steam restart hit the `userCollections` poisoning described under "M3 library hiding" (fixed in `f43f5c3`). **Working and tested on the Mac** for the collection-grouped view; the recent-activity groups were checked through `recentAppCollections` data, not on screen with that sort turned on.
 
 ## Settings page and diagnostic report (report path live on the Mac; page render pending)
 
