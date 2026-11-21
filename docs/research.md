@@ -510,7 +510,9 @@ First run, 21 November 2026, Mac client, build 1794536281, plugin at main `8bb19
 
 Each change showed within 800 ms with no reload, and turning the toggle off again hid both again. Native Hidden (10 games), Favorites and the filter state never changed.
 
-So **Working and tested on the Mac:** Recent Games, collection shelves and lists, ordinary What's New entries, and what Home renders for them. **Not yet seen live:** Play Next (neither game was a suggestion; the script now also picks one) and takeover events (none were showing; these cannot be produced on demand). Windows is still to re-confirm.
+Second run with the script at `3725f15` (output on `live-out/m4-probe` at `3bc79ee`), same build and plugin: `ok: true`, every step clean for three games. 1062090 and 291650 behaved as in the first run. 2706300, picked from Play Next, left the Play Next suggestions (true, false, true, false, true) and its Home image and label (1 to 0 and back) at each step.
+
+So **Working and tested on the Mac:** Recent Games, collection shelves and lists, ordinary What's New entries, Play Next, and what Home renders for them. **Not seen live:** takeover events (none were showing in either run, and they cannot be produced on demand; same `BIsVisible` filter as ordinary entries). Windows is still to re-confirm.
 
 ## macOS (live, 21 November 2026)
 
