@@ -467,7 +467,7 @@ Rerun with the fixed script (450ceee, same plugin build; outputs at `live-out/m4
 
 One read-only run made a few seconds after Steam started found no item and no `game-context-menu` marker, and a run 5 seconds later passed. Its output was not kept. The marker is set by the patched `render()` itself, before the plugin is called, so a menu rendered by patched code always sets it, even when the plugin frontend has not loaded yet. No marker therefore means the menu came from unpatched code (or did not open). That fits the first UI load: Millennium reloads the UI with patches once the backends are ready (see "Loading"). It is the same startup window PLAN.md accepts for the brief flash. Separately, if a menu opens after the reload but before the plugin frontend has loaded, the marker is set and that one menu has no item; the next one does. The check script now records `markersBefore` and `markersAfterMenu`, so a repeat would show which case it was.
 
-## Settings page and diagnostic report (read from source, live check pending)
+## Settings page and diagnostic report (report path live on the Mac; page render pending)
 
 Written 21 November 2026 for T8, from Valve's public `steamui_websrc_all.zip` for build **1794536281** (same zip and hash as in "M3 library hiding"), plus the live M1 findings. No device was reachable from this session, so nothing new here has been seen in the running client yet.
 
@@ -475,11 +475,13 @@ Written 21 November 2026 for T8, from Valve's public `steamui_websrc_all.zip` fo
 | --- | --- | --- |
 | `PACKAGE_CL` in the SharedJSContext URL (`location.search`) | Steam build in the report | Live, M1 ("Environment"). Steam's own code reads it the same way: `new URLSearchParams(window.location.search).get("PACKAGE_CL")`. |
 | `appStore.GetAppOverviewByAppID(appid)` | Names in the tagged list | Live, M1 (exists). Source: `return this.m_mapApps.has(Be)?this.m_mapApps.get(Be):null`. |
-| app overview `display_name` | Names in the tagged list | Source only, build 1794536281 (`GetAppOverviewByAppID(ka).display_name` is how Steam reads it). Type-checked; a miss shows "Unknown game". |
+| app overview `display_name` | Names in the tagged list | Live on the Mac, build 1794536281 (a string; see the live result below). Steam reads it as `GetAppOverviewByAppID(ka).display_name`. Type-checked; a miss shows "Unknown game". |
 | `ownerWindow.navigator.clipboard.writeText` | Copy report, export | Source only: Steam copies this way (`ownerWindow.navigator.clipboard.writeText(...)`), with a selected textarea and `document.execCommand("copy")` as its own fallback. The page shows the text for copying by hand when both fail. Not a Steam API. |
 | `millennium.version()`, `jit.os`, `jit.arch` (Lua) | Millennium version and OS in the report | `millennium.version()` live, M1. `jit.os` live on the Mac ("OSX"). |
 
 Millennium UI components used: `Field`, `ToggleField` (already live in the earlier settings switch), `TextField` and `DialogButton` (from Millennium's SDK typings, not yet seen rendered). Confirmations are inline (the button turns into confirm and cancel); `showModal` is not used.
+
+Live result, 21 November 2026, Mac client (macOS arm64), build 1794536281, Millennium v3.6.3, plugin at 2157287 (output on branch `live-out/m4-probe`, f1aa05c, `live-out/settings-check.json`): `ok: true`, no errors. `PACKAGE_CL` read as `1794536281`, `display_name` is a string, `sdDiagnostics` is exported, and `navigator.clipboard.writeText` exists. The report showed plugin 0.1.0, Millennium v3.6.3, OSX (arm64), overall ok, tags loaded and writable, `library-visibility` attached, the two on-demand hooks "not seen yet" (the Library was not opened), and the update check error "no published release found (HTTP 404)" as expected with no release. So `display_name` and the report path are **confirmed live on the Mac**. The page itself was not seen rendered: Millennium's settings sidebar is hidden on the Mac build and could not be opened over CDP. Still to check on Windows: the rendered page and its buttons.
 
 Live check: `bun scripts/cdp.ts eval @scripts/live/settings-check.js`. Read-only. It checks `PACKAGE_CL`, that `display_name` is a string for the first app, and prints the diagnostic report through `PLUGIN_LIST['steam-discreet'].sdDiagnostics.report()`. Also to check by eye: the page renders, Copy diagnostic report reaches the clipboard, export and import round-trip, Remove and Remove all, and the rollback button (only shown once an older version is saved).
 

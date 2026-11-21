@@ -23,8 +23,8 @@ export function readSteamBuild(root: unknown = globalThis): string | null {
 
 /**
  * A game's display name, from `appStore.GetAppOverviewByAppID(appid).display_name`.
- * `GetAppOverviewByAppID` is confirmed live (M1); `display_name` is read from
- * Steam's source for build 1794536281 (docs/research.md, "Settings page").
+ * Both confirmed live, build 1794536281 (`display_name` on the Mac; see
+ * docs/research.md, "Settings page and diagnostic report").
  * Null when Steam does not know the game, for example one no longer owned.
  */
 export function readAppName(appId: number, root: unknown = globalThis): string | null {
