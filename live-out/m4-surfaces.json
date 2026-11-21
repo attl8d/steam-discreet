@@ -1,0 +1,246 @@
+{
+  "ok": true,
+  "build": "1794536281",
+  "games": [
+    {
+      "appid": 1062090,
+      "name": "<game>",
+      "steps": [
+        {
+          "name": "tagged, toggle off",
+          "problems": [],
+          "snapshot": {
+            "visible": false,
+            "recent": false,
+            "playNext": false,
+            "whatsNew": 0,
+            "takeover": 0,
+            "collections": {
+              "favorite": false,
+              "uc-xJwr1zvKrwiS": false
+            },
+            "dom": {
+              "imgs": 0,
+              "textHits": 0
+            },
+            "hidden": false,
+            "favorite": true,
+            "hiddenSize": 10,
+            "filter": "{\"nFormatVersion\":2,\"strSearchText\":\"\",\"filterGroups\":[{\"rgOptions\":[1],\"bAcceptUnion\":true},{\"rgOptions\":[5],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false}],\"setSuggestions\":{}}"
+          }
+        },
+        {
+          "name": "toggle on",
+          "problems": [],
+          "snapshot": {
+            "visible": true,
+            "recent": true,
+            "playNext": false,
+            "whatsNew": 0,
+            "takeover": 0,
+            "collections": {
+              "favorite": true,
+              "uc-xJwr1zvKrwiS": true
+            },
+            "dom": {
+              "imgs": 3,
+              "textHits": 2
+            },
+            "hidden": false,
+            "favorite": true,
+            "hiddenSize": 10,
+            "filter": "{\"nFormatVersion\":2,\"strSearchText\":\"\",\"filterGroups\":[{\"rgOptions\":[1],\"bAcceptUnion\":true},{\"rgOptions\":[5],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false}],\"setSuggestions\":{}}"
+          }
+        },
+        {
+          "name": "toggle off again",
+          "problems": [],
+          "snapshot": {
+            "visible": false,
+            "recent": false,
+            "playNext": false,
+            "whatsNew": 0,
+            "takeover": 0,
+            "collections": {
+              "favorite": false,
+              "uc-xJwr1zvKrwiS": false
+            },
+            "dom": {
+              "imgs": 0,
+              "textHits": 0
+            },
+            "hidden": false,
+            "favorite": true,
+            "hiddenSize": 10,
+            "filter": "{\"nFormatVersion\":2,\"strSearchText\":\"\",\"filterGroups\":[{\"rgOptions\":[1],\"bAcceptUnion\":true},{\"rgOptions\":[5],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false}],\"setSuggestions\":{}}"
+          }
+        },
+        {
+          "name": "untagged",
+          "problems": [],
+          "snapshot": {
+            "visible": true,
+            "recent": true,
+            "playNext": false,
+            "whatsNew": 0,
+            "takeover": 0,
+            "collections": {
+              "favorite": true,
+              "uc-xJwr1zvKrwiS": true
+            },
+            "dom": {
+              "imgs": 3,
+              "textHits": 2
+            },
+            "hidden": false,
+            "favorite": true,
+            "hiddenSize": 10,
+            "filter": "{\"nFormatVersion\":2,\"strSearchText\":\"\",\"filterGroups\":[{\"rgOptions\":[1],\"bAcceptUnion\":true},{\"rgOptions\":[5],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false}],\"setSuggestions\":{}}"
+          }
+        }
+      ],
+      "base": {
+        "visible": true,
+        "recent": true,
+        "playNext": false,
+        "whatsNew": 0,
+        "takeover": 0,
+        "collections": {
+          "favorite": true,
+          "uc-xJwr1zvKrwiS": true
+        },
+        "dom": {
+          "imgs": 3,
+          "textHits": 2
+        },
+        "hidden": false,
+        "favorite": true,
+        "hiddenSize": 10,
+        "filter": "{\"nFormatVersion\":2,\"strSearchText\":\"\",\"filterGroups\":[{\"rgOptions\":[1],\"bAcceptUnion\":true},{\"rgOptions\":[5],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false}],\"setSuggestions\":{}}"
+      }
+    },
+    {
+      "appid": 291650,
+      "name": "<game>",
+      "steps": [
+        {
+          "name": "tagged, toggle off",
+          "problems": [],
+          "snapshot": {
+            "visible": false,
+            "recent": false,
+            "playNext": false,
+            "whatsNew": 0,
+            "takeover": 0,
+            "collections": {
+              "uc-FlTWQ6LxoQRV": false
+            },
+            "dom": {
+              "imgs": 0,
+              "textHits": 0
+            },
+            "hidden": false,
+            "favorite": false,
+            "hiddenSize": 10,
+            "filter": "{\"nFormatVersion\":2,\"strSearchText\":\"\",\"filterGroups\":[{\"rgOptions\":[1],\"bAcceptUnion\":true},{\"rgOptions\":[5],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false}],\"setSuggestions\":{}}"
+          }
+        },
+        {
+          "name": "toggle on",
+          "problems": [],
+          "snapshot": {
+            "visible": true,
+            "recent": false,
+            "playNext": false,
+            "whatsNew": 1,
+            "takeover": 0,
+            "collections": {
+              "uc-FlTWQ6LxoQRV": true
+            },
+            "dom": {
+              "imgs": 1,
+              "textHits": 1
+            },
+            "hidden": false,
+            "favorite": false,
+            "hiddenSize": 10,
+            "filter": "{\"nFormatVersion\":2,\"strSearchText\":\"\",\"filterGroups\":[{\"rgOptions\":[1],\"bAcceptUnion\":true},{\"rgOptions\":[5],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false}],\"setSuggestions\":{}}"
+          }
+        },
+        {
+          "name": "toggle off again",
+          "problems": [],
+          "snapshot": {
+            "visible": false,
+            "recent": false,
+            "playNext": false,
+            "whatsNew": 0,
+            "takeover": 0,
+            "collections": {
+              "uc-FlTWQ6LxoQRV": false
+            },
+            "dom": {
+              "imgs": 0,
+              "textHits": 0
+            },
+            "hidden": false,
+            "favorite": false,
+            "hiddenSize": 10,
+            "filter": "{\"nFormatVersion\":2,\"strSearchText\":\"\",\"filterGroups\":[{\"rgOptions\":[1],\"bAcceptUnion\":true},{\"rgOptions\":[5],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false}],\"setSuggestions\":{}}"
+          }
+        },
+        {
+          "name": "untagged",
+          "problems": [],
+          "snapshot": {
+            "visible": true,
+            "recent": false,
+            "playNext": false,
+            "whatsNew": 1,
+            "takeover": 0,
+            "collections": {
+              "uc-FlTWQ6LxoQRV": true
+            },
+            "dom": {
+              "imgs": 1,
+              "textHits": 1
+            },
+            "hidden": false,
+            "favorite": false,
+            "hiddenSize": 10,
+            "filter": "{\"nFormatVersion\":2,\"strSearchText\":\"\",\"filterGroups\":[{\"rgOptions\":[1],\"bAcceptUnion\":true},{\"rgOptions\":[5],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false}],\"setSuggestions\":{}}"
+          }
+        }
+      ],
+      "base": {
+        "visible": true,
+        "recent": false,
+        "playNext": false,
+        "whatsNew": 1,
+        "takeover": 0,
+        "collections": {
+          "uc-FlTWQ6LxoQRV": true
+        },
+        "dom": {
+          "imgs": 1,
+          "textHits": 1
+        },
+        "hidden": false,
+        "favorite": false,
+        "hiddenSize": 10,
+        "filter": "{\"nFormatVersion\":2,\"strSearchText\":\"\",\"filterGroups\":[{\"rgOptions\":[1],\"bAcceptUnion\":true},{\"rgOptions\":[5],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false},{\"rgOptions\":[],\"bAcceptUnion\":false}],\"setSuggestions\":{}}"
+      }
+    }
+  ],
+  "notes": [],
+  "stores": {
+    "playNextStore": true,
+    "libraryEventStore": true
+  },
+  "state": {
+    "ready": true,
+    "revealed": false,
+    "seamStatus": "ok",
+    "warning": null
+  }
+}
