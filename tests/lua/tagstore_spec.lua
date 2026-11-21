@@ -131,6 +131,17 @@ describe("tagstore.paths", function()
             assert.are.equal("/tmp/sd", (paths.root()))
         end)
 
+        it("detects macOS from jit.os without an override", function()
+            local real_jit = rawget(_G, "jit")
+            -- luacheck: ignore 122
+            _G.jit = { os = "OSX" }
+            env.HOME = "/Users/u"
+            local root, source = paths.root()
+            _G.jit = real_jit
+            assert.are.equal("/Users/u/Library/Application Support/SteamDiscreet", root)
+            assert.are.equal("macOS", source)
+        end)
+
         it("uses XDG, then ~/.local/share, elsewhere", function()
             paths.set_os_override("Linux")
             env.HOME = "/home/u"
