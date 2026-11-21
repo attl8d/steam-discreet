@@ -3,13 +3,13 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-	{ ignores: ['node_modules/', '.millennium/', '.millennium-build/', 'dist/', 'build/', 'tests/hooks/fixtures/', 'tools/patch-crosscheck/target/'] },
+	{ ignores: ['node_modules/', '.millennium/', '.millennium-build/', 'dist/', 'build/', 'tests/hooks/fixtures/', 'tools/patch-crosscheck/target/', 'scripts/live/'] },
 	js.configs.recommended,
 	...tseslint.configs.strictTypeChecked,
 	{
 		languageOptions: {
 			parserOptions: {
-				project: ['./frontend/tsconfig.json', './webview/tsconfig.json', './tests/tsconfig.json'],
+				project: ['./frontend/tsconfig.json', './webview/tsconfig.json', './tests/tsconfig.json', './scripts/tsconfig.json'],
 				tsconfigRootDir: import.meta.dirname,
 			},
 		},

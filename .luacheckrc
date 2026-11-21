@@ -6,3 +6,4 @@ exclude_files = { ".millennium/", "node_modules/", ".luarocks/", "lua_modules/" 
 files["backend/tagstore/rpc.lua"] = {
     globals = { "tags_open", "tags_add", "tags_remove", "tags_clear", "tags_export", "tags_import" },
 }
+files["backend/main.lua"] = { globals = { "steam_discreet_hook_manifest" } }

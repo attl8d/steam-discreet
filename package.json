@@ -3,7 +3,7 @@
     "dev": "starlight watch",
     "build": "starlight pack",
     "prepare": "starlight lsp",
-    "typecheck": "tsc -p frontend && tsc -p webview && tsc -p tests",
+    "typecheck": "tsc -p frontend && tsc -p webview && tsc -p tests && tsc -p scripts",
     "lint": "eslint .",
     "lint:lua": "luacheck backend tests/lua scripts",
     "test": "bun test tests/frontend tests/hooks",
@@ -19,6 +19,7 @@
     "@types/react-dom": "19.1.1",
     "eslint": "9.39.1",
     "eslint-plugin-react-hooks": "7.0.1",
+    "mobx": "6.13.7",
     "typescript": "5.9.3",
     "typescript-eslint": "8.46.4"
   },
