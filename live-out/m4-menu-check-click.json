@@ -1,9 +1,6 @@
 {
-  "ok": false,
-  "errors": [
-    "menu did not switch to Unmark",
-    "Unmark did not untag the game"
-  ],
+  "ok": true,
+  "errors": [],
   "steps": [
     {
       "step": "clicked Mark",
@@ -31,11 +28,27 @@
     },
     {
       "step": "reopened menu while tagged and revealed",
-      "menu": null
+      "menu": {
+        "label": "Unmark as adult",
+        "className": "_1n7Wloe5jZ6fSuvV18NNWI contextMenuItem contextMenuItem",
+        "disabled": false,
+        "inWindow": "main",
+        "siblingItems": [
+          "Play",
+          "Unmark as adult",
+          "Remove from Favorites",
+          "Add to",
+          "Remove from",
+          "Manage",
+          "",
+          "Properties..."
+        ]
+      },
+      "error": null
     },
     {
       "step": "clicked Unmark",
-      "tagged": true
+      "tagged": false
     },
     {
       "step": "toggle off",
