@@ -1,8 +1,9 @@
 import type { AppId } from '../domain/appId';
+import { getState, isTagged, tagGames, untagGames } from './library';
 import { decideTagMenu, failureMessage, type TagMenuAction } from '../domain/tagMenu';
 
 /**
- * The part of frontend/services/library.ts (owned by the library-hiding work)
+ * The part of frontend/services/library.ts
  * that the context menu uses. tagGames/untagGames reject when the save fails.
  */
 export interface TagLibrary {
@@ -37,3 +38,11 @@ export async function runMenuAction(library: TagLibrary, action: TagMenuAction, 
 		return false;
 	}
 }
+
+/** The installed plugin-wide library (frontend/services/library.ts). */
+export const installedLibrary: TagLibrary = {
+	tagGames: (ids) => tagGames(ids),
+	untagGames: (ids) => untagGames(ids),
+	isTagged: (id) => isTagged(id),
+	getState: () => getState(),
+};
