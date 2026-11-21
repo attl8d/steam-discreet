@@ -553,6 +553,17 @@ The plugin side: `services/library.ts` holds a `ViewMode` (`hidden`, `all`, `onl
 
 Live check: `scripts/live/adult-only-check.js` (with `SD_CHECK_APPID` set to a game in a user collection with recent activity). It switches the mode through the plugin only and never changes Steam's sort, grouping or filter settings.
 
+Live run, 21 November 2026, Mac client, build 1794536281, plugin at `21ca2f9` (output: branch `live-out/m4-probe` at `37b87b0`, `live-out/adult-only-check.json`), sidebar grouped by collection, not sorted by recent activity, with 98 games already tagged: `ok: true`.
+
+| Step | All visible | Untagged games in All, collection groups and recent-activity groups | Test game | Header counts | 18+ icon |
+| --- | --- | --- | --- | --- | --- |
+| Start (hidden) | 104 | n/a | visible | n/a | not pressed |
+| Adult only (test game tagged) | 99 (98 tags + the test game) | 0 | listed in Favorites, its user collection and the "Recent" group | none stale | pressed, right after the eye (5 icons in the row) |
+| Back to hidden | 103 | all shown again | hidden (still tagged) | none stale | not pressed |
+| End (untagged) | 104 | n/a | visible | n/a | not pressed |
+
+Native Hidden, Favorites and the filter state were unchanged at every step, and the 98 existing tags were the same before and after. An earlier run at `35d9e09` right after a Steam restart hit the `userCollections` poisoning described under "M3 library hiding" (fixed in `f43f5c3`). **Working and tested on the Mac** for the collection-grouped view; the recent-activity groups were checked through `recentAppCollections` data, not on screen with that sort turned on.
+
 ## Settings page and diagnostic report (report path live on the Mac; page render pending)
 
 Written 21 November 2026 for T8, from Valve's public `steamui_websrc_all.zip` for build **1794536281** (same zip and hash as in "M3 library hiding"), plus the live M1 findings. No device was reachable from this session, so nothing new here has been seen in the running client yet.
