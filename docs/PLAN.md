@@ -6,7 +6,7 @@ Revised 15 November 2026 (original prepared 31 October 2026). Status: planning; 
 
 A small Millennium plugin for the Windows Steam desktop client. The user tags games as adult, and those games stay out of ordinary Library browsing until one toggle reveals them.
 
-macOS (Apple Silicon) is experimental, added 21 November 2026: it works only with a patched Millennium build (`tools/millennium-macos`). See "macOS" in `docs/research.md`.
+macOS (Apple Silicon) is experimental, added 21 November 2026: it needs Millennium built from PR 841 merged with v3.6.3 (`tools/millennium-macos`). See "macOS" in `docs/research.md`.
 
 **Who it hides games from: the user themself.** The goal is to browse the Library without seeing tagged games unless the toggle is on. Nobody is trying to get past it, so the plugin has to be reliable and unobtrusive, not leak-proof.
 
