@@ -25,4 +25,6 @@ cmake --build build/osx-release
 scripts/macos/install_macos.sh --runtime-build-dir build/osx-release --wrapper-build-dir build/osx-release
 ```
 
+Built and run live on 22 November 2026 (see "Build from PR 841 and v3.6.3" in `docs/research.md`). When the macOS connector tests are run together, 2 of 3 fail at `MillenniumAcceptPipeBroker`. This is a harness issue in PR 841 (the process-wide broker is never reset); each passes on its own (`millennium_macos_connector_tests "<test name>"`, as `ctest` runs them).
+
 `9d24bd9c` is the PR 841 head on 22 November 2026. If iFleey force-pushes and GitHub no longer serves it, a git bundle of it is kept in the project files (`millennium-mac/pr841-9d24bd9c.bundle`, needs `0d182be3` from an upstream clone). If PR 841 moves on, or is merged into a release, this recipe and the fixup patch need to be redone.

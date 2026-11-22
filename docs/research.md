@@ -622,7 +622,16 @@ Upstream commit `2c15d5ba` ("Fix Millennium sidebar menu crashing on latest beta
 
 ### Build from PR 841 and v3.6.3 (22 November 2026)
 
-The live results below were made with PR 841 at `35418d28` plus `0001` and `0002`, merged with Millennium main at `ca8976dc` (v3.6.3 plus CI and packaging commits). Since 22 November 2026 the build is PR 841 at `9d24bd9c` (our fix plus iFleey's four macOS fixes: patch-list worker that can be stopped when CDP ends, inherited descriptors kept in the Steam Helper, patches matched against the selected Steam install, and no patch engine without an IPC channel), merged with the v3.6.3 tag. See `tools/millennium-macos/README.md`. **Not yet built or run on the Mac.**
+The live results below were made with PR 841 at `35418d28` plus `0001` and `0002`, merged with Millennium main at `ca8976dc` (v3.6.3 plus CI and packaging commits). Since 22 November 2026 the build is PR 841 at `9d24bd9c` (our fix plus iFleey's four macOS fixes: patch-list worker that can be stopped when CDP ends, inherited descriptors kept in the Steam Helper, patches matched against the selected Steam install, and no patch engine without an IPC channel), merged with the v3.6.3 tag. See `tools/millennium-macos/README.md`.
+
+Live result, 22 November 2026, Mac client (macOS arm64), Steam build **1794536281**, this recipe installed as runtime `v3.6.3-24-ga64d963c-dirty` (write-tree `2ef71b9d`; "dirty" because the fixup is applied, not committed), plugin 0.1.0, read-only checks only:
+
+- Build: `cmake --build build/osx-release` 592 steps, 0 errors. Installed with `install_macos.sh` in wrapper mode; Steam ready 9 s after `scripts/restart-steam-mac.sh`.
+- Log: `patch list loaded: 3 patch(es) from 1 plugin(s): [steam-discreet]`, then `sp.js: 'steam-discreet': matched [11982324, 11982642), 1 transform(s), +133 B`, `matched [13457547, 13458086), ... +126 B`, `matched [12877500, 12877828), ... +194 B`, `sp.js: served patched`. No Millennium errors.
+- CDP: `__steamDiscreetHooks` is `{"library-visibility":1}`. `sdDiagnostics.report()`: overall ok, tags loaded and writable, self-check ok, `library-visibility` attached; `game-context-menu` and `reveal-toggle` "not seen yet" (those parts of Steam were not opened); updater 404 (no release) as expected. Millennium reports v3.6.3.
+- Sidebar fix: `MILLENNIUM_API.quickAccessMenuClasses.Title` is now a string (it was undefined) and no "An error occurred while rendering" was found. The sidebar panel itself was not opened by eye.
+- `millennium_macos_connector_tests`: run together, 1 of 3 cases passes and 2 fail at `REQUIRE( MillenniumAcceptPipeBroker(broker[0]) == 0 )` (got -1); run one at a time, all pass. `MillenniumAcceptPipeBroker` (`src/engine/cdp_connector.cc`) refuses a second broker in the same process and nothing resets it, so only the first case gets one. This is a test harness issue in PR 841, and likely the cause of the earlier "failed handoff" failure.
+- Rollback: the previous runtime `v3.6.3-25-g23367f6e` (fork branch `mac-v3.6.3`, source in a local checkout) is still under `~/Library/Application Support/Millennium/runtime`; reinstall it with the same `install_macos.sh` command from that checkout.
 
 ### Live result with the fix
 
