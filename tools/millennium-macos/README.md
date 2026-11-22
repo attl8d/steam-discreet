@@ -15,7 +15,7 @@ v3.6.3 also brings upstream commit `2c15d5ba` (sidebar crash fix), formerly `000
 
 ```sh
 git clone https://github.com/SteamClientHomebrew/Millennium.git && cd Millennium
-git fetch origin 9d24bd9c && git checkout 9d24bd9c
+git fetch origin 9d24bd9c2e6ce941b7a0052e57a2df42e12c85ee && git checkout FETCH_HEAD
 git -c user.name=build -c user.email=build@localhost merge --no-edit -X theirs v3.6.3
 git apply /path/to/steam-discreet/tools/millennium-macos/v3.6.3-merge-fixup.patch
 git add -A && git write-tree   # expect 2ef71b9dd4275c4e21765377c49c8af49ea2313f
