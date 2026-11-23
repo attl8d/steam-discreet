@@ -56,7 +56,7 @@ guide_spotlight() {
     cat <<MSG
 
 If you start Steam from Spotlight (Cmd-Space): two apps are called Steam.
-Type "steam" and pick the one with the Millennium icon a few times;
+Type "steam" and pick the Steam with "$(id -un)" under its name a few times;
 Spotlight learns your choice and puts it first. Optionally also hide
 Valve's from file search: Spotlight settings and Finder are opening now;
 under Search Privacy, click + and add Steam.app (remove it to undo).
@@ -103,24 +103,28 @@ build_app() {
     osacompile -o "$app" "$source"
     install -m 0755 "$here/launch.sh" "$app/Contents/Resources/launch.sh"
 
-    # "Steam" gets Millennium's icon so it is easy to tell apart from Valve's
-    # app in Spotlight; "Steam (plain)" gets Steam's own .icns.
-    local icon="" wrapper
-    for wrapper in "/Applications/Steam Millennium.app" "$HOME/Applications/Steam Millennium.app"; do
-        if [ "$url_scheme" = "yes" ] && [ -f "$wrapper/Contents/Resources/AppIcon.icns" ]; then
-            icon="$wrapper/Contents/Resources/AppIcon.icns"
-            break
-        fi
-    done
-    if [ -z "$icon" ]; then
-        icon="$(defaults read "$valve_app/Contents/Info" CFBundleIconFile 2>/dev/null || true)"
-        icon="$valve_app/Contents/Resources/${icon%.icns}.icns"
-    fi
+    # Both apps get Steam's own icon, copied from Valve's Steam.app at install
+    # time (Valve's icon is never stored in this repo). Spotlight shows the
+    # launcher with the short user name under it (seen on macOS 27).
+    # Steam.app has a classic .icns and a newer asset-catalog icon
+    # (Assets.car, named by CFBundleIconName). macOS prefers the asset catalog
+    # and draws an .icns-only app inside a grey frame, so copy both; the .icns
+    # is the fallback for older macOS.
+    local icon icon_name resources="$app/Contents/Resources"
+    # osacompile's own asset-catalog icon would take precedence over ours.
+    /usr/libexec/PlistBuddy -c "Delete :CFBundleIconName" "$plist" 2>/dev/null || true
+    rm -f "$resources/Assets.car"
+    icon="$(defaults read "$valve_app/Contents/Info" CFBundleIconFile 2>/dev/null || true)"
+    icon="$valve_app/Contents/Resources/${icon%.icns}.icns"
+    icon_name="$(defaults read "$valve_app/Contents/Info" CFBundleIconName 2>/dev/null || true)"
     if [ -f "$icon" ]; then
-        cp "$icon" "$app/Contents/Resources/applet.icns"
-        # An asset-catalog icon would take precedence over applet.icns.
-        /usr/libexec/PlistBuddy -c "Delete :CFBundleIconName" "$plist" 2>/dev/null || true
-        rm -f "$app/Contents/Resources/Assets.car"
+        cp "$icon" "$resources/applet.icns"
+    fi
+    if [ -n "$icon_name" ] && [ -f "$valve_app/Contents/Resources/Assets.car" ]; then
+        cp "$valve_app/Contents/Resources/Assets.car" "$resources/Assets.car"
+        /usr/libexec/PlistBuddy -c "Add :CFBundleIconName string $icon_name" "$plist"
+    elif [ ! -f "$icon" ]; then
+        echo "warning: no icon found in $valve_app (CFBundleIconFile, CFBundleIconName); $(basename "$app") keeps the generic AppleScript icon" >&2
     fi
 
     /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $id" "$plist" 2>/dev/null \
