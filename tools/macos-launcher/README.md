@@ -20,6 +20,8 @@ After installing:
 1. Drag `~/Applications/Steam.app` to the Dock and remove Valve's Steam icon. If you start Steam from Spotlight: both apps are called Steam, and Spotlight's app results come from the installed-apps list plus what you picked before, not from the search index, so its Search Privacy list does not remove Valve's app there (seen on macOS 27). Type "steam" and pick the launcher (same icon as Valve's; it is the one in `~/Applications`, not `/Applications`) two or three times; Spotlight then puts it first. If it doesn't, `killall Spotlight` once. This can't be scripted: there is no API for Spotlight's learned ranking, and App Management blocks hiding or renaming Steam.app.
 2. In Steam, Settings, Interface, turn off "Run Steam when my computer starts", then add `~/Applications/Steam.app` under System Settings, General, Login Items.
 
+If the Dock or Finder still shows an old icon after reinstalling, run `killall Dock` (it restarts only the Dock), or unpin the launcher and pin `~/Applications/Steam.app` again.
+
 Log: `~/Library/Logs/SteamLauncher.log`.
 
 ## To check live
