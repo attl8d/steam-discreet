@@ -1,0 +1,144 @@
+diff --git a/src/bootstrap/README.md b/src/bootstrap/README.md
+index 05b15e65..3495ac0b 100644
+--- a/src/bootstrap/README.md
++++ b/src/bootstrap/README.md
+@@ -7,7 +7,7 @@
+ - Linux (SteamRT3 64-bit client, `steamrt64/steam`) -> `libXtst.so.6` proxy hook (`libmillennium_bootstrap_x64.so`, built by the default Linux presets)
+ - macOS (Install, default) -> `Steam Millennium.app` wrapper + runtime payload installed by `scripts/install_macos.sh`
+ > -   macOS (Legacy install) -> `libtier0_s.dylib` reexport proxy via `scripts/install_macos.sh --tier0-legacy`
+-> -   macOS (Debug) -> `steam_osx` wrapper + bootstrap dylib preload + `execve` reinjection into Steam main process + child hook that loads `hhx64` in Steam Helper
++> -   macOS (Debug) -> `steam_osx` wrapper + bootstrap dylib preload + `execv`/`execve` reinjection into Steam main process + child hook that loads `hhx64` in Steam Helper
+ 
+ ## Linux runtime dependencies
+ 
+diff --git a/src/engine/cdp_api.cc b/src/engine/cdp_api.cc
+index c9b04344..262b79a3 100644
+--- a/src/engine/cdp_api.cc
++++ b/src/engine/cdp_api.cc
+@@ -134,6 +134,7 @@ void cdp_client::shutdown()
+         m_cleanup_cv.notify_all();
+     }
+     if (m_cleanup_thread.joinable()) m_cleanup_thread.join();
++    if (m_callback_pool) m_callback_pool->shutdown();
+ 
+     /** clear all event callbacks */
+     {
+diff --git a/src/instrumentation/internal/loopback_ipc.cc b/src/instrumentation/internal/loopback_ipc.cc
+index 11b46507..f62ae677 100644
+--- a/src/instrumentation/internal/loopback_ipc.cc
++++ b/src/instrumentation/internal/loopback_ipc.cc
+@@ -184,17 +184,7 @@ static std::vector<uint8_t> build_patch_list_payload()
+     });
+ }
+ 
+-struct LoopbackConn
+-{
+-    std::atomic<bool> alive{ true };
+-    std::atomic<bool> ready{ false };
+-    std::mutex write_mu;
+-    fd_t write_fd = INVALID_FD;
+-    fd_t read_fd = INVALID_FD;
+-    int notifier_id = -1;
+-};
+-
+-static bool conn_write_frame(LoopbackConn& conn, const std::vector<uint8_t>& payload)
++static void send_patch_list(LoopbackConn& conn)
+ {
+     std::lock_guard<std::mutex> lock(conn.write_mu);
+     if (!conn.alive.load()) return;
+@@ -259,6 +249,17 @@ static void reader_loop(std::shared_ptr<LoopbackConn> conn, int notifier_id)
+     close_fd(conn->read_fd);
+ }
+ 
++static void serve_conn(std::shared_ptr<LoopbackConn> conn)
++{
++    // Plugin backends can publish an update while the first snapshot is still being written.
++    const int notifier_id = patch_update_notifier::instance().add_listener([conn]()
++    {
++        send_patch_list(*conn);
++    });
++    send_patch_list(*conn);
++    reader_loop(std::move(conn), notifier_id);
++}
++
+ #ifdef __APPLE__
+ void serve_loopback_conn(int write_fd, int read_fd, int stop_fd)
+ #else
+@@ -272,35 +273,14 @@ void register_loopback_conn(fd_t write_fd, fd_t read_fd)
+     conn->stop_fd = stop_fd;
+ #endif
+ 
++#ifdef __APPLE__
++    serve_conn(std::move(conn));
++#else
+     /**
+      * The first frame is written from the connection's own thread: on Windows this runs inside the
+      * CreateProcess hook, before the webhelper exists to read the pipe, so a patch list bigger than
+      * the pipe buffer (~4 KB) would block the hook and Steam would never start (#947).
+      */
+-    std::thread([conn = std::move(conn)]() mutable
+-    {
+-        conn->notifier_id = patch_update_notifier::instance().add_listener([conn]()
+-        {
+-            if (!conn->alive.load() || !conn->ready.load()) return;
+-            if (!conn_write_frame(*conn, build_patch_list_payload())) {
+-                conn->alive.store(false);
+-                conn_close_write(*conn);
+-            }
+-        });
+-
+-        bool delivered = conn_write_frame(*conn, build_patch_list_payload());
+-        conn->ready.store(true);
+-        delivered = delivered && conn_write_frame(*conn, build_patch_list_payload());
+-
+-        if (!delivered) {
+-            logger.warn("loopback IPC: initial patch list write failed, dropping connection");
+-            conn->alive.store(false);
+-            patch_update_notifier::instance().remove_listener(conn->notifier_id);
+-            conn_close_write(*conn);
+-            close_fd(conn->read_fd);
+-            return;
+-        }
+-
+-        reader_loop(std::move(conn));
+-    }).detach();
++    std::thread(serve_conn, std::move(conn)).detach();
++#endif
+ }
+diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
+index c9737b87..b9f47fcf 100644
+--- a/tests/CMakeLists.txt
++++ b/tests/CMakeLists.txt
+@@ -30,6 +30,9 @@ if(MILLENNIUM_RUN_TESTS_ON_BUILD)
+     if(UNIX)
+         list(APPEND _run_tests_deps millennium_posix_lifecycle_test millennium_logger_concurrency_test millennium_child_shutdown_test)
+     endif()
++    if(TARGET millennium_macos_connector_tests)
++        list(APPEND _run_tests_deps millennium_macos_connector_tests)
++    endif()
+     if(MILLENNIUM_BUILD_MAIN)
+         list(APPEND _run_tests_deps millennium_lua_tests Millennium)
+     endif()
+diff --git a/tests/cpp/CMakeLists.txt b/tests/cpp/CMakeLists.txt
+index 49cef27e..1fe09250 100644
+--- a/tests/cpp/CMakeLists.txt
++++ b/tests/cpp/CMakeLists.txt
+@@ -39,3 +39,18 @@ endif()
+ add_executable(sdk_health sdk_health.cc)
+ target_compile_features(sdk_health PRIVATE cxx_std_23)
+ target_link_libraries(sdk_health PRIVATE nlohmann_json::nlohmann_json)
++
++if(APPLE AND MILLENNIUM_BUILD_MAIN)
++  add_executable(millennium_macos_connector_tests test_macos_cdp_connector.cc)
++  target_compile_features(millennium_macos_connector_tests PRIVATE cxx_std_23)
++  target_include_directories(millennium_macos_connector_tests PRIVATE ${CMAKE_SOURCE_DIR}/src/include)
++  target_link_libraries(millennium_macos_connector_tests PRIVATE Millennium Catch2::Catch2WithMain nlohmann_json::nlohmann_json)
++  # Each connector test owns the process-wide broker and termination state.
++  foreach(test_name IN ITEMS
++      "macOS connector exits without a Helper"
++      "macOS CDP can connect and stop with a full patch pipe"
++      "macOS failed handoff preserves the current Helper connection")
++    add_test(NAME "${test_name}" COMMAND millennium_macos_connector_tests "${test_name}")
++    set_tests_properties("${test_name}" PROPERTIES TIMEOUT 15)
++  endforeach()
++endif()
