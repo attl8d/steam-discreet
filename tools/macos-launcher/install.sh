@@ -56,7 +56,7 @@ guide_spotlight() {
     cat <<MSG
 
 If you start Steam from Spotlight (Cmd-Space): two apps are called Steam.
-Type "steam" and pick the one with the Millennium icon a few times;
+Type "steam" and pick "Steam — $(id -F 2>/dev/null || id -un)" a few times;
 Spotlight learns your choice and puts it first. Optionally also hide
 Valve's from file search: Spotlight settings and Finder are opening now;
 under Search Privacy, click + and add Steam.app (remove it to undo).
@@ -103,19 +103,12 @@ build_app() {
     osacompile -o "$app" "$source"
     install -m 0755 "$here/launch.sh" "$app/Contents/Resources/launch.sh"
 
-    # "Steam" gets Millennium's icon so it is easy to tell apart from Valve's
-    # app in Spotlight; "Steam (plain)" gets Steam's own .icns.
-    local icon="" wrapper
-    for wrapper in "/Applications/Steam Millennium.app" "$HOME/Applications/Steam Millennium.app"; do
-        if [ "$url_scheme" = "yes" ] && [ -f "$wrapper/Contents/Resources/AppIcon.icns" ]; then
-            icon="$wrapper/Contents/Resources/AppIcon.icns"
-            break
-        fi
-    done
-    if [ -z "$icon" ]; then
-        icon="$(defaults read "$valve_app/Contents/Info" CFBundleIconFile 2>/dev/null || true)"
-        icon="$valve_app/Contents/Resources/${icon%.icns}.icns"
-    fi
+    # Both apps get Steam's own icon, copied from Valve's Steam.app at install
+    # time (Valve's icon is never stored in this repo). In Spotlight the
+    # launcher is told apart by its location: it shows as "Steam — <user>".
+    local icon
+    icon="$(defaults read "$valve_app/Contents/Info" CFBundleIconFile 2>/dev/null || true)"
+    icon="$valve_app/Contents/Resources/${icon%.icns}.icns"
     if [ -f "$icon" ]; then
         cp "$icon" "$app/Contents/Resources/applet.icns"
         # An asset-catalog icon would take precedence over applet.icns.
