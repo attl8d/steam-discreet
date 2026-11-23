@@ -56,7 +56,7 @@ guide_spotlight() {
     cat <<MSG
 
 If you start Steam from Spotlight (Cmd-Space): two apps are called Steam.
-Type "steam" and pick the one in ~/Applications (not /Applications) a few times;
+Type "steam" and pick the Steam with "$(id -un)" under its name a few times;
 Spotlight learns your choice and puts it first. Optionally also hide
 Valve's from file search: Spotlight settings and Finder are opening now;
 under Search Privacy, click + and add Steam.app (remove it to undo).
@@ -104,8 +104,8 @@ build_app() {
     install -m 0755 "$here/launch.sh" "$app/Contents/Resources/launch.sh"
 
     # Both apps get Steam's own icon, copied from Valve's Steam.app at install
-    # time (Valve's icon is never stored in this repo). In Spotlight the two
-    # look alike; the launcher is told apart by its location, ~/Applications.
+    # time (Valve's icon is never stored in this repo). Spotlight shows the
+    # launcher with the short user name under it (seen on macOS 27).
     local icon
     icon="$(defaults read "$valve_app/Contents/Info" CFBundleIconFile 2>/dev/null || true)"
     icon="$valve_app/Contents/Resources/${icon%.icns}.icns"
