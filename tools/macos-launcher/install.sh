@@ -106,16 +106,25 @@ build_app() {
     # Both apps get Steam's own icon, copied from Valve's Steam.app at install
     # time (Valve's icon is never stored in this repo). Spotlight shows the
     # launcher with the short user name under it (seen on macOS 27).
-    local icon
+    # Steam.app has a classic .icns and a newer asset-catalog icon
+    # (Assets.car, named by CFBundleIconName). macOS prefers the asset catalog
+    # and draws an .icns-only app inside a grey frame, so copy both; the .icns
+    # is the fallback for older macOS.
+    local icon icon_name resources="$app/Contents/Resources"
+    # osacompile's own asset-catalog icon would take precedence over ours.
+    /usr/libexec/PlistBuddy -c "Delete :CFBundleIconName" "$plist" 2>/dev/null || true
+    rm -f "$resources/Assets.car"
     icon="$(defaults read "$valve_app/Contents/Info" CFBundleIconFile 2>/dev/null || true)"
     icon="$valve_app/Contents/Resources/${icon%.icns}.icns"
+    icon_name="$(defaults read "$valve_app/Contents/Info" CFBundleIconName 2>/dev/null || true)"
     if [ -f "$icon" ]; then
-        cp "$icon" "$app/Contents/Resources/applet.icns"
-        # An asset-catalog icon would take precedence over applet.icns.
-        /usr/libexec/PlistBuddy -c "Delete :CFBundleIconName" "$plist" 2>/dev/null || true
-        rm -f "$app/Contents/Resources/Assets.car"
-    else
-        echo "warning: no .icns found in $valve_app (CFBundleIconFile); $(basename "$app") keeps the generic AppleScript icon" >&2
+        cp "$icon" "$resources/applet.icns"
+    fi
+    if [ -n "$icon_name" ] && [ -f "$valve_app/Contents/Resources/Assets.car" ]; then
+        cp "$valve_app/Contents/Resources/Assets.car" "$resources/Assets.car"
+        /usr/libexec/PlistBuddy -c "Add :CFBundleIconName string $icon_name" "$plist"
+    elif [ ! -f "$icon" ]; then
+        echo "warning: no icon found in $valve_app (CFBundleIconFile, CFBundleIconName); $(basename "$app") keeps the generic AppleScript icon" >&2
     fi
 
     /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $id" "$plist" 2>/dev/null \
